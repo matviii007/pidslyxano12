@@ -1,0 +1,37 @@
+<article class="post" data-post-url="{% url 'post_detail' post.pk %}">
+  <div class="post__side">
+    {% if post.is_moderation %}<div class="avatar avatar--moderation">М</div>
+    {% elif post.is_anonymous %}<div class="avatar avatar--anon"><svg><use href="#i-mask"/></svg></div>
+    {% else %}<a href="{% url 'user_profile' post.author.username %}"><div class="avatar" style="--av: {{ post.author.profile.color|default:'#ff7a59' }}">{% if post.author.profile.avatar %}<img class="avatar__image" src="{{ post.author.profile.avatar.url }}" alt="">{% else %}{{ post.author.profile.initials|default:post.author.username|first|upper }}{% endif %}</div></a>{% endif %}
+    <div class="post__thread"></div>
+  </div>
+  <div class="post__body">
+    <header class="post__head">
+      {% if post.is_moderation %}<span class="post__name">Модерація</span>
+      {% elif post.is_anonymous %}<span class="post__name">Анонім</span>
+      {% else %}<a class="post__name" href="{% url 'user_profile' post.author.username %}">{{ post.author.get_full_name|default:post.author.username }}
+        {% if post.author.profile.is_verified %}<span class="verified" title="Підтверджений акаунт" aria-label="Підтверджений акаунт"><svg class="ic"><use href="#i-check"/></svg></span>{% endif %}
+        {% if post.author.profile.role == 'admin' %}<span class="role-badge role-badge--admin">Адміністратор</span>
+        {% elif post.author.profile.role == 'junior_moderator' %}<span class="role-badge role-badge--moderator">Молодший модератор</span>
+        {% elif post.author.profile.role == 'senior_moderator' %}<span class="role-badge role-badge--moderator">Старший модератор</span>{% endif %}
+      </a>{% endif %}
+      <span class="post__meta">{{ post.created_at|timesince }} тому</span>
+      <details class="dropdown post__more">
+        <summary class="icon-btn" aria-label="Більше"><svg class="ic"><use href="#i-more"/></svg></summary>
+        <div class="menu">
+          <button type="button" data-share><svg class="ic"><use href="#i-link"/></svg> Скопіювати посилання</button>
+          <a href="{% url 'report' %}?post={{ post.pk }}" class="is-danger"><svg class="ic"><use href="#i-flag"/></svg> Поскаржитися</a>
+        </div>
+      </details>
+    </header>
+    {% if post.tag %}<div class="post__tags"><a class="tag" style="--tag: {{ post.tag.color }}" href="{% url 'feed' %}?topic={{ post.tag.name|urlencode }}">#{{ post.tag.name }}</a></div>{% endif %}
+    <a class="post__link" href="{% url 'post_detail' post.pk %}"><p class="post__text">{{ post.text }}</p></a>
+    {% if post.image %}<img class="post__image" src="{{ post.image.url }}" alt="Фото до допису">{% endif %}
+    <footer class="post__actions">
+      <span class="act"><svg class="ic"><use href="#i-heart"/></svg><span>{{ post.likes.count }}</span></span>
+      <a class="act" href="{% url 'post_detail' post.pk %}#reply" aria-label="Коментувати"><svg class="ic"><use href="#i-comment"/></svg><span>{{ post.replies.count }}</span></a>
+      <span class="act"><svg class="ic"><use href="#i-repost"/></svg><span>{{ post.reposts.count }}</span></span>
+      <button type="button" class="act" data-share aria-label="Надіслати"><svg class="ic"><use href="#i-share"/></svg></button>
+    </footer>
+  </div>
+</article>

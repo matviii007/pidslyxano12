@@ -1,0 +1,12 @@
+{% for event in upcoming_events %}
+<div class="event">
+  <div class="event__date"><b>{{ event.starts_at|date:"j" }}</b><small>{{ event.starts_at|date:"M" }}</small></div>
+  <div>
+    <b>{{ event.title }}</b>
+    <small>{% if event.location %}{{ event.location }} · {% endif %}{{ event.starts_at|date:"H:i" }}</small>
+    {% if event.description %}<small>{{ event.description }}</small>{% endif %}
+  </div>
+</div>
+{% empty %}
+<p class="muted">Майбутніх подій поки немає.</p>
+{% endfor %}

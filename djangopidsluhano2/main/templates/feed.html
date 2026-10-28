@@ -1,0 +1,549 @@
+{% load static %}
+<!doctype html>
+<html lang="uk">
+<!--
+  ШАБЛОН:   templates/feed.html
+  URL:      /
+  VIEW:     feed(request)
+  ДАНІ З VIEW (context): posts, tags, active_tab, active_tag
+  GET-параметри: ?tab=all|anon|following  ?topic=<назва теми>
+-->
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Стрічка · Підслухано у Ліцеї 8</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;700;800&display=swap" rel="stylesheet">
+  <!-- У Django: [% load static %] на початку файлу і href="[% static 'css/style.css' %]" -->
+  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20261028-5">
+  <link rel="stylesheet" href="{% static 'css/role-badges.css' %}">
+  <!-- Тема (світла/темна) вмикається до показу сторінки, щоб не було "блимання" -->
+  <script>
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem('pl8-theme'); } catch (e) {}
+      if (t !== 'dark' && t !== 'light') t = 'light';
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
+</head>
+<body>
+  <!-- ═══════════ BASE.HTML: ПОЧАТОК ═══════════
+       Усе від цього місця до коментаря "BLOCK CONTENT" однакове на всіх сторінках.
+       У Django це переїде у templates/base.html. -->
+  <svg class="sprite" aria-hidden="true">
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10.3A4.2 4.2 0 0 1 12 7.6a4.2 4.2 0 0 1 7.5 2.6c0 5.7-7.5 10.3-7.5 10.3z"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 9a6 6 0 0 1 12 0c0 6.5 2.5 8 2.5 8h-17S6 15.5 6 9"/><path d="M10 20.5a2 2 0 0 0 4 0"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+    <symbol id="i-comment" viewBox="0 0 24 24"><path d="M20.5 12a8.5 8.5 0 0 1-12.4 7.5L3.5 20.5l1-4.4A8.5 8.5 0 1 1 20.5 12z"/></symbol>
+    <symbol id="i-repost" viewBox="0 0 24 24"><path d="m17 2.5 3.5 3.5L17 9.5"/><path d="M3.5 11V9.5A3.5 3.5 0 0 1 7 6h13.5"/><path d="M7 21.5 3.5 18 7 14.5"/><path d="M20.5 13v1.5A3.5 3.5 0 0 1 17 18H3.5"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><path d="M21.5 2.5 10.5 13.5"/><path d="M21.5 2.5 15 21.5l-4.5-8-8-4.5z"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.5 14A8.5 8.5 0 1 1 10 3.5a6.5 6.5 0 0 0 10.5 10.5z"/></symbol>
+    <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21.5V4"/><path d="M5 4h11l-2 4 2 4H5"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-at" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/></symbol>
+    <symbol id="i-poll" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+    <symbol id="i-mask" viewBox="0 0 24 24"><path d="M2.5 9.2c3.2-1.6 6.3-1.6 9.5 0 3.2-1.6 6.3-1.6 9.5 0v2.3c0 4-2.8 6-5.2 6-2.1 0-3.1-2-4.3-2s-2.2 2-4.3 2c-2.4 0-5.2-2-5.2-6zM5.6 11.6a2 1.3 0 1 0 4 0a2 1.3 0 1 0-4 0zM14.4 11.6a2 1.3 0 1 0 4 0a2 1.3 0 1 0-4 0z" fill-rule="evenodd"/></symbol>
+    <symbol id="i-logo" viewBox="0 0 40 40"><path d="M20 3C10.6 3 3 9.9 3 18.4c0 4.7 2.3 8.9 6 11.7L7.6 37l7.3-4.2c1.6.4 3.3.6 5.1.6 9.4 0 17-6.9 17-15S29.4 3 20 3z" style="fill: var(--accent)"/><text x="20" y="25.5" text-anchor="middle" style="fill: #fff; font: 800 15px Unbounded, sans-serif">8</text></symbol>
+  </svg>
+
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="{% url 'feed' %}"><svg class="logo-mark"><use href="#i-logo"/></svg><span class="brand__text"><b>Підслухано</b><small>у Ліцеї 8</small></span></a>
+      <nav class="nav">
+      <a class="nav__item is-active" href="{% url 'feed' %}"><svg class="ic"><use href="#i-home"/></svg><span>Стрічка</span></a>
+      <a class="nav__item" href="{% url 'search' %}"><svg class="ic"><use href="#i-search"/></svg><span>Пошук</span></a>
+      <a class="nav__item" href="{% url 'notifications' %}"><svg class="ic"><use href="#i-bell"/></svg><span>Сповіщення</span>{% if unread_notification_count %}<span class="nav__badge">{{ unread_notification_count }}</span>{% endif %}</a>
+      <a class="nav__item" href="{% url 'profile' %}"><svg class="ic"><use href="#i-user"/></svg><span>Профіль</span></a>
+      <a class="nav__item" href="{% url 'rules' %}"><svg class="ic"><use href="#i-book"/></svg><span>Правила</span></a>
+      </nav>
+      <a class="btn btn--big" href="{% url 'post_create' %}"><svg class="ic"><use href="#i-plus"/></svg><span>Новий допис</span></a>
+      <div class="sidebar__bottom">
+        <button type="button" class="nav__item" data-theme-toggle><svg class="ic only-light"><use href="#i-moon"/></svg><svg class="ic only-dark"><use href="#i-sun"/></svg><span>Змінити тему</span></button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <!-- ═══════════ [% block content %] ═══════════
+           Ось ця частина — унікальна для сторінки "feed.html". -->
+
+      <div class="topbar">
+        <div class="topbar__row">
+          <a class="topbar__logo" href="{% url 'feed' %}"><svg class="logo-mark"><use href="#i-logo"/></svg></a>
+          <h1 class="topbar__title">Стрічка</h1>
+          <button type="button" class="icon-btn topbar__theme" data-theme-toggle aria-label="Змінити тему"><svg class="ic only-light"><use href="#i-moon"/></svg><svg class="ic only-dark"><use href="#i-sun"/></svg></button>
+        </div>
+        <nav class="tabs" data-tabs-nav data-default="all" data-target=".feed [data-filter]">
+          <a class="tabs__btn" href="?tab=all" data-tab="all">Для вас</a>
+          <a class="tabs__btn" href="?tab=anon" data-tab="anon">Анонімні</a>
+          <a class="tabs__btn" href="?tab=following" data-tab="following">Підписки</a>
+        </nav>
+        <div class="chips">
+          <a class="chip chip--all" href="{% url 'feed' %}" data-tag="">Усі теми</a>
+          {% for tag in tags %}
+          <a class="chip" style="--tag: {{ tag.color }}" href="{% url 'feed' %}?topic={{ tag.name|urlencode }}" data-tag="{{ tag.name }}">#{{ tag.name }}</a>
+          {% endfor %}
+          {% for tag in custom_tags %}
+          <a class="chip" style="--tag: {{ tag.color }}" href="{% url 'feed' %}?topic={{ tag.name|urlencode }}" data-tag="{{ tag.name }}">#{{ tag.name }}</a>
+          {% endfor %}
+        </div>
+      </div>
+
+      <a class="composer-inline" href="{% url 'post_create' %}">
+        <div class="avatar" style="--av: {{ request.user.profile.color }}">{% if request.user.profile.avatar %}<img class="avatar__image" src="{{ request.user.profile.avatar.url }}" alt="">{% else %}{{ request.user.profile.initials }}{% endif %}</div>
+        <span class="composer-inline__ph">Що почув(-ла) сьогодні в ліцеї?</span>
+        <span class="btn btn--sm">Написати</span>
+      </a>
+
+      <!-- СПИСОК ДОПИСІВ.
+           Кожна <article class="post"> — це одна картка. У Django їх буде не 12 вручну, а цикл:
+             [% for post in posts %]
+               [% include "partials/post_card.html" %]
+             [% empty %]
+               ...повідомлення "Поки тиша"...
+             [% endfor %]
+           Готовий приклад картки дивись у django_examples/templates/partials/post_card.html -->
+      <div class="feed">
+      {% for post in posts %}
+      <article class="post" data-post-url="{% url 'post_detail' post.pk %}" data-tag="{{ post.tag.name }}" data-filter="all{% if post.is_anonymous %} anon{% else %} following{% endif %}">
+        {% if post.is_pinned %}<div class="post__pinned"><svg class="ic"><use href="#i-pin"/></svg> Закріплено модераторами</div>{% endif %}
+        <div class="post__side">
+          {% if post.is_moderation %}
+          <div class="avatar avatar--moderation" title="Модерація">М</div>
+          {% elif post.is_anonymous %}
+          <div class="avatar avatar--anon" title="Анонім"><svg><use href="#i-mask"/></svg></div>
+          {% else %}
+          <a href="{% url 'user_profile' post.author.username %}" aria-label="Профіль {{ post.author.get_full_name|default:post.author.username }}"><div class="avatar" style="--av: {{ post.author.profile.color }}">{% if post.author.profile.avatar %}<img class="avatar__image" src="{{ post.author.profile.avatar.url }}" alt="">{% else %}{{ post.author.profile.initials }}{% endif %}</div></a>
+          {% endif %}
+          <div class="post__thread"></div>
+        </div>
+        <div class="post__body">
+          <header class="post__head">
+            {% if post.is_moderation %}
+            <span class="post__name">Модерація <span class="role-badge role-badge--moderation">Модерація</span></span>
+            {% elif post.is_anonymous %}
+            <span class="post__name">Анонім</span>
+            {% else %}
+            <span class="post__name">{{ post.author.get_full_name|default:post.author.username }}
+              {% if post.author.profile.is_verified %}<span class="verified" title="Підтверджений акаунт" aria-label="Підтверджений акаунт"><svg class="ic"><use href="#i-check"/></svg></span>{% endif %}
+              {% if post.author.profile.role == 'admin' %}<span class="role-badge role-badge--admin">Адміністратор</span>
+              {% elif post.author.profile.role == 'junior_moderator' %}<span class="role-badge role-badge--moderator">Молодший модератор</span>
+              {% elif post.author.profile.role == 'senior_moderator' %}<span class="role-badge role-badge--moderator">Старший модератор</span>{% endif %}
+            </span>
+            {% endif %}
+            <span class="post__meta">{{ post.created_at|timesince }} тому</span>
+            <details class="dropdown post__more">
+              <summary class="icon-btn" aria-label="Більше"><svg class="ic"><use href="#i-more"/></svg></summary>
+              <div class="menu">
+                <button type="button" data-share><svg class="ic"><use href="#i-link"/></svg> Скопіювати посилання</button>
+                <a href="{% url 'report' %}?post={{ post.pk }}" class="is-danger"><svg class="ic"><use href="#i-flag"/></svg> Поскаржитися</a>
+              </div>
+            </details>
+          </header>
+          <div class="post__tags"><a class="tag" style="--tag: {{ post.tag.color }}" href="?topic={{ post.tag.name|urlencode }}">#{{ post.tag.name }}</a></div>
+          <a class="post__link" href="{% url 'post_detail' post.pk %}"><p class="post__text">{{ post.text }}</p></a>
+          {% if post.image %}<img class="post__image" src="{{ post.image.url }}" alt="Фото до допису">{% endif %}
+          <footer class="post__actions">
+            <form method="post" action="{% url 'post_like' post.pk %}">{% csrf_token %}<button type="submit" class="act act--like{% if post.user_liked %} is-on{% endif %}" aria-label="Вподобати"><svg class="ic"><use href="#i-heart"/></svg><span>{{ post.likes.count }}</span></button></form>
+            <a class="act" href="{% url 'post_detail' post.pk %}#reply" aria-label="Коментувати"><svg class="ic"><use href="#i-comment"/></svg><span>{{ post.replies.count }}</span></a>
+            <form method="post" action="{% url 'post_repost' post.pk %}">{% csrf_token %}<button type="submit" class="act act--repost{% if post.user_reposted %} is-on{% endif %}" aria-label="{% if post.user_reposted %}Скасувати репост{% else %}Зробити репост{% endif %}"><svg class="ic"><use href="#i-repost"/></svg><span>{{ post.reposts.count }}</span></button></form>
+            <button type="button" class="act" data-share aria-label="Надіслати"><svg class="ic"><use href="#i-share"/></svg></button>
+          </footer>
+        </div>
+      </article>
+      {% empty %}
+      <div class="empty"><div class="empty__emoji">🤫</div><h3>Поки тиша</h3><p>У цій темі ще ніхто нічого не підслухав. Стань першим!</p></div>
+      {% endfor %}
+      {% if show_demo_posts %}
+      <article class="post" data-tag="оголошення" data-filter="all following">
+        <div class="post__pinned"><svg class="ic"><use href="#i-pin"/></svg> Закріплено модераторами</div>
+        <div class="post__side">
+          <a href="{% url 'user_profile' 'maxym' %}"><div class="avatar" style="--av: #ff4d2e">М</div></a>
+          <div class="post__thread"></div>
+        </div>
+        <div class="post__body">
+          <header class="post__head">
+            <a class="post__name" href="{% url 'user_profile' 'maxym' %}">Модерація</a> <span class="verified" title="Офіційний акаунт"><svg class="ic"><use href="#i-check"/></svg></span>
+            <span class="post__meta">адмін · 1 год</span>
+            <details class="dropdown post__more">
+              <summary class="icon-btn" aria-label="Більше"><svg class="ic"><use href="#i-more"/></svg></summary>
+              <div class="menu">
+                <button type="button" data-share><svg class="ic"><use href="#i-link"/></svg> Скопіювати посилання</button>
+                <a href="{% url 'report' %}" class="is-danger"><svg class="ic"><use href="#i-flag"/></svg> Поскаржитися</a>
+              </div>
+            </details>
+          </header>
+          <div class="post__tags"><a class="tag" style="--tag: #ff4d2e" href="?topic=оголошення">#оголошення</a></div>
+          <a class="post__link" href="{% url 'post_detail' 1 %}"><p class="post__text">Нагадуємо правила: пишемо без образ, не називаємо справжніх імен у «пікантних» постах і не викладаємо чужі фото без дозволу. Кожен анонімний допис проходить модерацію — зазвичай до 15 хвилин 🙌</p></a>
+          <footer class="post__actions">
+            <button type="button" class="act act--like" aria-label="Вподобати"><svg class="ic"><use href="#i-heart"/></svg><span>214</span></button>
+            <a class="act" href="{% url 'post_detail' 1 %}#reply" aria-label="Коментувати"><svg class="ic"><use href="#i-comment"/></svg><span>1</span></a>
+            <button type="button" class="act act--repost" aria-label="Поширити"><svg class="ic"><use href="#i-repost"/></svg><span>12</span></button>
+            <button type="button" class="act" data-share aria-label="Надіслати"><svg class="ic"><use href="#i-share"/></svg></button>
+          </footer>
+        </div>
+      </article>
+
+      <article class="post" data-tag="кохання" data-filter="all anon">
+        <div class="post__side">
+          <div class="avatar avatar--anon" title="Анонім"><svg><use href="#i-mask"/></svg></div>
+          <div class="post__thread"></div>
+        </div>
+        <div class="post__body">
+          <header class="post__head">
+            <span class="post__name">Анонім</span>
+            <span class="post__meta">учень ліцею · 12 хв</span>
+            <details class="dropdown post__more">
+              <summary class="icon-btn" aria-label="Більше"><svg class="ic"><use href="#i-more"/></svg></summary>
+              <div class="menu">
+                <button type="button" data-share><svg class="ic"><use href="#i-link"/></svg> Скопіювати посилання</button>
+                <a href="{% url 'report' %}" class="is-danger"><svg class="ic"><use href="#i-flag"/></svg> Поскаржитися</a>
+              </div>
+            </details>
+          </header>
+          <div class="post__tags"><a class="tag" style="--tag: #e8457c" href="?topic=кохання">#кохання</a></div>
+          <a class="post__link" href="{% url 'post_detail' 1 %}"><p class="post__text">Хлопцю з 11-Б, який щоранку тримає двері в головному корпусі: ти навіть не уявляєш, як це рятує мій настрій о 7:55. Дякую 🙏</p></a>
+          <footer class="post__actions">
+            <button type="button" class="act act--like" aria-label="Вподобати"><svg class="ic"><use href="#i-heart"/></svg><span>87</span></button>
+            <a class="act" href="{% url 'post_detail' 1 %}#reply" aria-label="Коментувати"><svg class="ic"><use href="#i-comment"/></svg><span>2</span></a>
+            <button type="button" class="act act--repost" aria-label="Поширити"><svg class="ic"><use href="#i-repost"/></svg><span>4</span></button>
+            <button type="button" class="act" data-share aria-label="Надіслати"><svg class="ic"><use href="#i-share"/></svg></button>
+          </footer>
+        </div>
+      </article>
+
+      <article class="post" data-tag="їдальня" data-filter="all anon">
+        <div class="post__side">
+          <div class="avatar avatar--anon" title="Анонім"><svg><use href="#i-mask"/></svg></div>
+          <div class="post__thread"></div>
+        </div>
+        <div class="post__body">
+          <header class="post__head">
+            <span class="post__name">Анонім</span>
+            <span class="post__meta">учень ліцею · 34 хв</span>
+            <details class="dropdown post__more">
+              <summary class="icon-btn" aria-label="Більше"><svg class="ic"><use href="#i-more"/></svg></summary>
+              <div class="menu">
+                <button type="button" data-share><svg class="ic"><use href="#i-link"/></svg> Скопіювати посилання</button>
+                <a href="{% url 'report' %}" class="is-danger"><svg class="ic"><use href="#i-flag"/></svg> Поскаржитися</a>
+              </div>
+            </details>
+          </header>
+          <div class="post__tags"><a class="tag" style="--tag: #e08a00" href="?topic=їдальня">#їдальня</a></div>
+          <a class="post__link" href="{% url 'post_detail' 1 %}"><p class="post__text">Вирішуємо раз і назавжди. Найкраще в нашій їдальні — це…</p></a>
+              <!-- Опитування. У Django: <form method="post" action="[% url 'poll_vote' post.id %]"> з кнопками name="option" value="[[ option.id ]]" -->
+              <form class="poll" data-poll>
+                <button type="button" class="poll__opt" data-votes="64">Сирники</button>
+                <button type="button" class="poll__opt" data-votes="81">Піца-булочка</button>
+                <button type="button" class="poll__opt" data-votes="47">Млинці з вишнею</button>
+                <button type="button" class="poll__opt" data-votes="23">Ношу з дому 🥪</button>
+                <div class="poll__total">215 голосів · голосування анонімне</div>
+              </form>
+          <footer class="post__actions">
+            <button type="button" class="act act--like" aria-label="Вподобати"><svg class="ic"><use href="#i-heart"/></svg><span>56</span></button>
+            <a class="act" href="{% url 'post_detail' 1 %}#reply" aria-label="Коментувати"><svg class="ic"><use href="#i-comment"/></svg><span>1</span></a>
+            <button type="button" class="act act--repost" aria-label="Поширити"><svg class="ic"><use href="#i-repost"/></svg><span>9</span></button>
+            <button type="button" class="act" data-share aria-label="Надіслати"><svg class="ic"><use href="#i-share"/></svg></button>
+          </footer>
+        </div>
+      </article>
+
+      <article class="post" data-tag="загублене" data-filter="all following">
+        <div class="post__side">
+          <a href="{% url 'user_profile' 'maxym' %}"><div class="avatar" style="--av: #3a6fe0">МТ</div></a>
+          <div class="post__thread"></div>
+        </div>
+        <div class="post__body">
+          <header class="post__head">
+            <a class="post__name" href="{% url 'user_profile' 'maxym' %}">Максим Ткаченко</a>
+            <span class="post__meta">9-В · 1 год</span>
+            <details class="dropdown post__more">
+              <summary class="icon-btn" aria-label="Більше"><svg class="ic"><use href="#i-more"/></svg></summary>
+              <div class="menu">
+                <button type="button" data-share><svg class="ic"><use href="#i-link"/></svg> Скопіювати посилання</button>
+                <a href="{% url 'report' %}" class="is-danger"><svg class="ic"><use href="#i-flag"/></svg> Поскаржитися</a>
+              </div>
+            </details>
+          </header>
+          <div class="post__tags"><a class="tag" style="--tag: #3a6fe0" href="?topic=загублене">#загублене</a></div>
+          <a class="post__link" href="{% url 'post_detail' 1 %}"><p class="post__text">Хто знайшов чорний пенал з наліпкою NASA біля спортзалу після 5 уроку — напишіть, будь ласка. Там флешка з проєктом з інформатики 😭</p></a>
+          <footer class="post__actions">
+            <button type="button" class="act act--like" aria-label="Вподобати"><svg class="ic"><use href="#i-heart"/></svg><span>31</span></button>
+            <a class="act" href="{% url 'post_detail' 1 %}#reply" aria-label="Коментувати"><svg class="ic"><use href="#i-comment"/></svg><span>2</span></a>
+            <button type="button" class="act act--repost" aria-label="Поширити"><svg class="ic"><use href="#i-repost"/></svg><span>17</span></button>
+            <button type="button" class="act" data-share aria-label="Надіслати"><svg class="ic"><use href="#i-share"/></svg></button>
+          </footer>
+        </div>
+      </article>
+
+      <article class="post" data-tag="вчителі" data-filter="all anon">
+        <div class="post__side">
+          <div class="avatar avatar--anon" title="Анонім"><svg><use href="#i-mask"/></svg></div>
+        </div>
+        <div class="post__body">
+          <header class="post__head">
+            <span class="post__name">Анонім</span>
+            <span class="post__meta">учень ліцею · 2 год</span>
+            <details class="dropdown post__more">
+              <summary class="icon-btn" aria-label="Більше"><svg class="ic"><use href="#i-more"/></svg></summary>
+              <div class="menu">
+                <button type="button" data-share><svg class="ic"><use href="#i-link"/></svg> Скопіювати посилання</button>
+                <a href="{% url 'report' %}" class="is-danger"><svg class="ic"><use href="#i-flag"/></svg> Поскаржитися</a>
+              </div>
+            </details>
+          </header>
+          <div class="post__tags"><a class="tag" style="--tag: #2f8f5b" href="?topic=вчителі">#вчителі</a></div>
+          <a class="post__link" href="{% url 'post_detail' 1 %}"><p class="post__text">Сьогодні на алгебрі похідну пояснили через траєкторію м&#x27;яча в баскетболі. Вперше за рік я реально зрозумів, навіщо вона потрібна. Респект нашій математичці!</p></a>
+          <footer class="post__actions">
+            <button type="button" class="act act--like" aria-label="Вподобати"><svg class="ic"><use href="#i-heart"/></svg><span>142</span></button>
+            <a class="act" href="{% url 'post_detail' 1 %}#reply" aria-label="Коментувати"><svg class="ic"><use href="#i-comment"/></svg><span></span></a>
+            <button type="button" class="act act--repost" aria-label="Поширити"><svg class="ic"><use href="#i-repost"/></svg><span>6</span></button>
+            <button type="button" class="act" data-share aria-label="Надіслати"><svg class="ic"><use href="#i-share"/></svg></button>
+          </footer>
+        </div>
+      </article>
+
+      <article class="post" data-tag="події" data-filter="all following">
+        <div class="post__side">
+          <a href="{% url 'user_profile' 'maxym' %}"><div class="avatar" style="--av: #0e9aa7">СБ</div></a>
+          <div class="post__thread"></div>
+        </div>
+        <div class="post__body">
+          <header class="post__head">
+            <a class="post__name" href="{% url 'user_profile' 'maxym' %}">Софія Бондар</a>
+            <span class="post__meta">11-А · 3 год</span>
+            <details class="dropdown post__more">
+              <summary class="icon-btn" aria-label="Більше"><svg class="ic"><use href="#i-more"/></svg></summary>
+              <div class="menu">
+                <button type="button" data-share><svg class="ic"><use href="#i-link"/></svg> Скопіювати посилання</button>
+                <a href="{% url 'report' %}" class="is-danger"><svg class="ic"><use href="#i-flag"/></svg> Поскаржитися</a>
+              </div>
+            </details>
+          </header>
+          <div class="post__tags"><a class="tag" style="--tag: #0e9aa7" href="?topic=події">#події</a></div>
+          <a class="post__link" href="{% url 'post_detail' 1 %}"><p class="post__text">Осінній бал — 24 жовтня! 🍂 Шукаємо ведучих, людей у світлову команду і тих, хто вміє робити фотозону. Пишіть у коментарі або підходьте в кабінет самоврядування (204) на великій перерві.</p></a>
+          <footer class="post__actions">
+            <button type="button" class="act act--like" aria-label="Вподобати"><svg class="ic"><use href="#i-heart"/></svg><span>98</span></button>
+            <a class="act" href="{% url 'post_detail' 1 %}#reply" aria-label="Коментувати"><svg class="ic"><use href="#i-comment"/></svg><span>2</span></a>
+            <button type="button" class="act act--repost" aria-label="Поширити"><svg class="ic"><use href="#i-repost"/></svg><span>22</span></button>
+            <button type="button" class="act" data-share aria-label="Надіслати"><svg class="ic"><use href="#i-share"/></svg></button>
+          </footer>
+        </div>
+      </article>
+
+      <article class="post" data-tag="смішне" data-filter="all anon">
+        <div class="post__side">
+          <div class="avatar avatar--anon" title="Анонім"><svg><use href="#i-mask"/></svg></div>
+          <div class="post__thread"></div>
+        </div>
+        <div class="post__body">
+          <header class="post__head">
+            <span class="post__name">Анонім</span>
+            <span class="post__meta">учень ліцею · 4 год</span>
+            <details class="dropdown post__more">
+              <summary class="icon-btn" aria-label="Більше"><svg class="ic"><use href="#i-more"/></svg></summary>
+              <div class="menu">
+                <button type="button" data-share><svg class="ic"><use href="#i-link"/></svg> Скопіювати посилання</button>
+                <a href="{% url 'report' %}" class="is-danger"><svg class="ic"><use href="#i-flag"/></svg> Поскаржитися</a>
+              </div>
+            </details>
+          </header>
+          <div class="post__tags"><a class="tag" style="--tag: #d1a000" href="?topic=смішне">#смішне</a></div>
+          <a class="post__link" href="{% url 'post_detail' 1 %}"><p class="post__text">На фізиці проєктор посеред уроку сам увімкнувся і показав заставку з котиками. Вчитель, не моргнувши: «А це, діти, демонстрація броунівського руху» 😂</p></a>
+          <footer class="post__actions">
+            <button type="button" class="act act--like" aria-label="Вподобати"><svg class="ic"><use href="#i-heart"/></svg><span>203</span></button>
+            <a class="act" href="{% url 'post_detail' 1 %}#reply" aria-label="Коментувати"><svg class="ic"><use href="#i-comment"/></svg><span>1</span></a>
+            <button type="button" class="act act--repost" aria-label="Поширити"><svg class="ic"><use href="#i-repost"/></svg><span>31</span></button>
+            <button type="button" class="act" data-share aria-label="Надіслати"><svg class="ic"><use href="#i-share"/></svg></button>
+          </footer>
+        </div>
+      </article>
+
+      <article class="post" data-tag="олімпіади" data-filter="all following">
+        <div class="post__side">
+          <a href="{% url 'profile' %}"><div class="avatar" style="--av: #ff7a59">ОК</div></a>
+          <div class="post__thread"></div>
+        </div>
+        <div class="post__body">
+          <header class="post__head">
+            <a class="post__name" href="{% url 'profile' %}">Олена Коваль</a>
+            <span class="post__meta">10-А · вчора</span>
+            <details class="dropdown post__more">
+              <summary class="icon-btn" aria-label="Більше"><svg class="ic"><use href="#i-more"/></svg></summary>
+              <div class="menu">
+                <button type="button" data-share><svg class="ic"><use href="#i-link"/></svg> Скопіювати посилання</button>
+                <a href="{% url 'post_create' %}"><svg class="ic"><use href="#i-check"/></svg> Редагувати</a>
+              </div>
+            </details>
+          </header>
+          <div class="post__tags"><a class="tag" style="--tag: #5c6bc0" href="?topic=олімпіади">#олімпіади</a></div>
+          <a class="post__link" href="{% url 'post_detail' 1 %}"><p class="post__text">Наша команда пройшла на обласний етап олімпіади з біології! Дякуємо нашій вчительці за всі ці вечори з задачами з генетики 🧬</p></a>
+          <footer class="post__actions">
+            <button type="button" class="act act--like is-on" aria-label="Вподобати"><svg class="ic"><use href="#i-heart"/></svg><span>76</span></button>
+            <a class="act" href="{% url 'post_detail' 1 %}#reply" aria-label="Коментувати"><svg class="ic"><use href="#i-comment"/></svg><span>1</span></a>
+            <button type="button" class="act act--repost" aria-label="Поширити"><svg class="ic"><use href="#i-repost"/></svg><span>3</span></button>
+            <button type="button" class="act" data-share aria-label="Надіслати"><svg class="ic"><use href="#i-share"/></svg></button>
+          </footer>
+        </div>
+      </article>
+
+      <article class="post" data-tag="подяка" data-filter="all anon">
+        <div class="post__side">
+          <div class="avatar avatar--anon" title="Анонім"><svg><use href="#i-mask"/></svg></div>
+        </div>
+        <div class="post__body">
+          <header class="post__head">
+            <span class="post__name">Анонім</span>
+            <span class="post__meta">учень ліцею · вчора</span>
+            <details class="dropdown post__more">
+              <summary class="icon-btn" aria-label="Більше"><svg class="ic"><use href="#i-more"/></svg></summary>
+              <div class="menu">
+                <button type="button" data-share><svg class="ic"><use href="#i-link"/></svg> Скопіювати посилання</button>
+                <a href="{% url 'report' %}" class="is-danger"><svg class="ic"><use href="#i-flag"/></svg> Поскаржитися</a>
+              </div>
+            </details>
+          </header>
+          <div class="post__tags"><a class="tag" style="--tag: #8a4fd8" href="?topic=подяка">#подяка</a></div>
+          <a class="post__link" href="{% url 'post_detail' 1 %}"><p class="post__text">Дякую тому, хто залишив парасольку на підвіконні біля вахти з запискою «Візьми, якщо треба». Я взяла, дійшла додому суха, сьогодні повернула ☂️</p></a>
+          <footer class="post__actions">
+            <button type="button" class="act act--like" aria-label="Вподобати"><svg class="ic"><use href="#i-heart"/></svg><span>119</span></button>
+            <a class="act" href="{% url 'post_detail' 1 %}#reply" aria-label="Коментувати"><svg class="ic"><use href="#i-comment"/></svg><span></span></a>
+            <button type="button" class="act act--repost" aria-label="Поширити"><svg class="ic"><use href="#i-repost"/></svg><span>8</span></button>
+            <button type="button" class="act" data-share aria-label="Надіслати"><svg class="ic"><use href="#i-share"/></svg></button>
+          </footer>
+        </div>
+      </article>
+
+      <article class="post" data-tag="питання" data-filter="all anon">
+        <div class="post__side">
+          <div class="avatar avatar--anon" title="Анонім"><svg><use href="#i-mask"/></svg></div>
+          <div class="post__thread"></div>
+        </div>
+        <div class="post__body">
+          <header class="post__head">
+            <span class="post__name">Анонім</span>
+            <span class="post__meta">учень ліцею · вчора</span>
+            <details class="dropdown post__more">
+              <summary class="icon-btn" aria-label="Більше"><svg class="ic"><use href="#i-more"/></svg></summary>
+              <div class="menu">
+                <button type="button" data-share><svg class="ic"><use href="#i-link"/></svg> Скопіювати посилання</button>
+                <a href="{% url 'report' %}" class="is-danger"><svg class="ic"><use href="#i-flag"/></svg> Поскаржитися</a>
+              </div>
+            </details>
+          </header>
+          <div class="post__tags"><a class="tag" style="--tag: #6b7f99" href="?topic=питання">#питання</a></div>
+          <a class="post__link" href="{% url 'post_detail' 1 %}"><p class="post__text">Хтось знає, чи буде перездача контрольної з хімії для тих, хто хворів минулого тижня?</p></a>
+          <footer class="post__actions">
+            <button type="button" class="act act--like" aria-label="Вподобати"><svg class="ic"><use href="#i-heart"/></svg><span>12</span></button>
+            <a class="act" href="{% url 'post_detail' 1 %}#reply" aria-label="Коментувати"><svg class="ic"><use href="#i-comment"/></svg><span>1</span></a>
+            <button type="button" class="act act--repost" aria-label="Поширити"><svg class="ic"><use href="#i-repost"/></svg><span></span></button>
+            <button type="button" class="act" data-share aria-label="Надіслати"><svg class="ic"><use href="#i-share"/></svg></button>
+          </footer>
+        </div>
+      </article>
+
+      <article class="post" data-tag="кохання" data-filter="all anon">
+        <div class="post__side">
+          <div class="avatar avatar--anon" title="Анонім"><svg><use href="#i-mask"/></svg></div>
+        </div>
+        <div class="post__body">
+          <header class="post__head">
+            <span class="post__name">Анонім</span>
+            <span class="post__meta">учень ліцею · 2 дні</span>
+            <details class="dropdown post__more">
+              <summary class="icon-btn" aria-label="Більше"><svg class="ic"><use href="#i-more"/></svg></summary>
+              <div class="menu">
+                <button type="button" data-share><svg class="ic"><use href="#i-link"/></svg> Скопіювати посилання</button>
+                <a href="{% url 'report' %}" class="is-danger"><svg class="ic"><use href="#i-flag"/></svg> Поскаржитися</a>
+              </div>
+            </details>
+          </header>
+          <div class="post__tags"><a class="tag" style="--tag: #e8457c" href="?topic=кохання">#кохання</a></div>
+          <a class="post__link" href="{% url 'post_detail' 1 %}"><p class="post__text">Дівчині в зеленому светрі, яка на великій перерві читала «Тіні забутих предків» у бібліотеці: який у тебе улюблений момент?</p></a>
+          <footer class="post__actions">
+            <button type="button" class="act act--like" aria-label="Вподобати"><svg class="ic"><use href="#i-heart"/></svg><span>64</span></button>
+            <a class="act" href="{% url 'post_detail' 1 %}#reply" aria-label="Коментувати"><svg class="ic"><use href="#i-comment"/></svg><span></span></a>
+            <button type="button" class="act act--repost" aria-label="Поширити"><svg class="ic"><use href="#i-repost"/></svg><span>2</span></button>
+            <button type="button" class="act" data-share aria-label="Надіслати"><svg class="ic"><use href="#i-share"/></svg></button>
+          </footer>
+        </div>
+      </article>
+
+      <article class="post" data-tag="їдальня" data-filter="all anon">
+        <div class="post__side">
+          <div class="avatar avatar--anon" title="Анонім"><svg><use href="#i-mask"/></svg></div>
+        </div>
+        <div class="post__body">
+          <header class="post__head">
+            <span class="post__name">Анонім</span>
+            <span class="post__meta">учень ліцею · 2 дні</span>
+            <details class="dropdown post__more">
+              <summary class="icon-btn" aria-label="Більше"><svg class="ic"><use href="#i-more"/></svg></summary>
+              <div class="menu">
+                <button type="button" data-share><svg class="ic"><use href="#i-link"/></svg> Скопіювати посилання</button>
+                <a href="{% url 'report' %}" class="is-danger"><svg class="ic"><use href="#i-flag"/></svg> Поскаржитися</a>
+              </div>
+            </details>
+          </header>
+          <div class="post__tags"><a class="tag" style="--tag: #e08a00" href="?topic=їдальня">#їдальня</a></div>
+          <a class="post__link" href="{% url 'post_detail' 1 %}"><p class="post__text">Чому чай у їдальні завжди або окріп, або крижаний? Третього не дано 🫖</p></a>
+          <footer class="post__actions">
+            <button type="button" class="act act--like" aria-label="Вподобати"><svg class="ic"><use href="#i-heart"/></svg><span>88</span></button>
+            <a class="act" href="{% url 'post_detail' 1 %}#reply" aria-label="Коментувати"><svg class="ic"><use href="#i-comment"/></svg><span></span></a>
+            <button type="button" class="act act--repost" aria-label="Поширити"><svg class="ic"><use href="#i-repost"/></svg><span>5</span></button>
+            <button type="button" class="act" data-share aria-label="Надіслати"><svg class="ic"><use href="#i-share"/></svg></button>
+          </footer>
+        </div>
+      </article>
+      {% endif %}
+      </div>
+
+      <!-- ═══════════ [% endblock %] ═══════════ -->
+    </main>
+
+    <aside class="aside">
+      <div class="card">
+        <h3 class="card__title">Найближчі події</h3>
+        {% include "partials/upcoming_events.html" %}
+      </div>
+      <div class="card">
+        <h3 class="card__title">Гарячі теми</h3>
+        <div class="aside-tags"><a class="tag" style="--tag: #e8457c" href="?topic=кохання">#кохання</a><a class="tag" style="--tag: #e08a00" href="?topic=їдальня">#їдальня</a><a class="tag" style="--tag: #0e9aa7" href="?topic=події">#події</a><a class="tag" style="--tag: #d1a000" href="?topic=смішне">#смішне</a></div>
+      </div>
+      <div class="card card--accent">
+        <h3 class="card__title"><svg class="ic"><use href="#i-shield"/></svg> Анонімно, але чесно</h3>
+        <p>Кожен анонімний допис перевіряють модератори. Без образ, без справжніх імен у зізнаннях.</p>
+        <a class="link-btn" href="{% url 'rules' %}">Читати правила →</a>
+      </div>
+      <p class="aside__foot">Шкільний проєкт · Ліцей №8 · 2026</p>
+    </aside>
+  </div>
+
+  <nav class="tabbar">
+    <a href="{% url 'feed' %}" class="is-active" aria-label="Стрічка"><svg class="ic"><use href="#i-home"/></svg></a>
+    <a href="{% url 'search' %}" aria-label="Пошук"><svg class="ic"><use href="#i-search"/></svg></a>
+    <a href="{% url 'post_create' %}" class="tabbar__plus" aria-label="Новий допис"><svg class="ic"><use href="#i-plus"/></svg></a>
+    <a href="{% url 'notifications' %}" aria-label="Сповіщення"><svg class="ic"><use href="#i-bell"/></svg>{% if unread_notification_count %}<span class="nav__badge">{{ unread_notification_count }}</span>{% endif %}</a>
+    <a href="{% url 'profile' %}" aria-label="Профіль"><svg class="ic"><use href="#i-user"/></svg></a>
+  </nav>
+  <div class="toast {% if messages %}is-on{% endif %}" id="toast" role="status" aria-live="polite">
+    {% if messages %}{% for message in messages %}{{ message }}{% endfor %}{% endif %}
+  </div>
+
+  <!-- У Django: <script src="[% static 'js/main.js' %]"></script> -->
+  <script src="{% static 'js/main.js' %}"></script>
+  <!-- ═══════════ BASE.HTML: КІНЕЦЬ ═══════════ -->
+</body>
+</html>

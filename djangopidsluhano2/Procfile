@@ -1,0 +1,1 @@
+web: gunicorn djangopidsluhano2.wsgi:application

@@ -1,0 +1,176 @@
+{% load static %}
+<!doctype html>
+<html lang="uk">
+<!--
+  ШАБЛОН:   templates/profile_edit.html
+  URL:      /profile/edit/
+  VIEW:     profile_edit(request)
+  ДАНІ З VIEW (context): form (ProfileForm)
+  Підказка: у Django форму можна вивести автоматично [[ form.as_p ]], а потім гарно оформити
+-->
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Редагування профілю · Підслухано у Ліцеї 8</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;700;800&display=swap" rel="stylesheet">
+  <!-- У Django: [% load static %] на початку файлу і href="[% static 'css/style.css' %]" -->
+  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20261028-5">
+  <!-- Тема (світла/темна) вмикається до показу сторінки, щоб не було "блимання" -->
+  <script>
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem('pl8-theme'); } catch (e) {}
+      if (t !== 'dark' && t !== 'light') t = 'light';
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
+</head>
+<body>
+  <!-- ═══════════ BASE.HTML: ПОЧАТОК ═══════════
+       Усе від цього місця до коментаря "BLOCK CONTENT" однакове на всіх сторінках.
+       У Django це переїде у templates/base.html. -->
+  <svg class="sprite" aria-hidden="true">
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10.3A4.2 4.2 0 0 1 12 7.6a4.2 4.2 0 0 1 7.5 2.6c0 5.7-7.5 10.3-7.5 10.3z"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 9a6 6 0 0 1 12 0c0 6.5 2.5 8 2.5 8h-17S6 15.5 6 9"/><path d="M10 20.5a2 2 0 0 0 4 0"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+    <symbol id="i-comment" viewBox="0 0 24 24"><path d="M20.5 12a8.5 8.5 0 0 1-12.4 7.5L3.5 20.5l1-4.4A8.5 8.5 0 1 1 20.5 12z"/></symbol>
+    <symbol id="i-repost" viewBox="0 0 24 24"><path d="m17 2.5 3.5 3.5L17 9.5"/><path d="M3.5 11V9.5A3.5 3.5 0 0 1 7 6h13.5"/><path d="M7 21.5 3.5 18 7 14.5"/><path d="M20.5 13v1.5A3.5 3.5 0 0 1 17 18H3.5"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><path d="M21.5 2.5 10.5 13.5"/><path d="M21.5 2.5 15 21.5l-4.5-8-8-4.5z"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.5 14A8.5 8.5 0 1 1 10 3.5a6.5 6.5 0 0 0 10.5 10.5z"/></symbol>
+    <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21.5V4"/><path d="M5 4h11l-2 4 2 4H5"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-at" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/></symbol>
+    <symbol id="i-poll" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+    <symbol id="i-mask" viewBox="0 0 24 24"><path d="M2.5 9.2c3.2-1.6 6.3-1.6 9.5 0 3.2-1.6 6.3-1.6 9.5 0v2.3c0 4-2.8 6-5.2 6-2.1 0-3.1-2-4.3-2s-2.2 2-4.3 2c-2.4 0-5.2-2-5.2-6zM5.6 11.6a2 1.3 0 1 0 4 0a2 1.3 0 1 0-4 0zM14.4 11.6a2 1.3 0 1 0 4 0a2 1.3 0 1 0-4 0z" fill-rule="evenodd"/></symbol>
+    <symbol id="i-logo" viewBox="0 0 40 40"><path d="M20 3C10.6 3 3 9.9 3 18.4c0 4.7 2.3 8.9 6 11.7L7.6 37l7.3-4.2c1.6.4 3.3.6 5.1.6 9.4 0 17-6.9 17-15S29.4 3 20 3z" style="fill: var(--accent)"/><text x="20" y="25.5" text-anchor="middle" style="fill: #fff; font: 800 15px Unbounded, sans-serif">8</text></symbol>
+  </svg>
+
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="{% url 'feed' %}"><svg class="logo-mark"><use href="#i-logo"/></svg><span class="brand__text"><b>Підслухано</b><small>у Ліцеї 8</small></span></a>
+      <nav class="nav">
+      <a class="nav__item" href="{% url 'feed' %}"><svg class="ic"><use href="#i-home"/></svg><span>Стрічка</span></a>
+      <a class="nav__item" href="{% url 'search' %}"><svg class="ic"><use href="#i-search"/></svg><span>Пошук</span></a>
+      <a class="nav__item" href="{% url 'notifications' %}"><svg class="ic"><use href="#i-bell"/></svg><span>Сповіщення</span>{% if unread_notification_count %}<span class="nav__badge">{{ unread_notification_count }}</span>{% endif %}</a>
+      <a class="nav__item is-active" href="{% url 'profile' %}"><svg class="ic"><use href="#i-user"/></svg><span>Профіль</span></a>
+      <a class="nav__item" href="{% url 'rules' %}"><svg class="ic"><use href="#i-book"/></svg><span>Правила</span></a>
+      </nav>
+      <a class="btn btn--big" href="{% url 'post_create' %}"><svg class="ic"><use href="#i-plus"/></svg><span>Новий допис</span></a>
+      <div class="sidebar__bottom">
+        <button type="button" class="nav__item" data-theme-toggle><svg class="ic only-light"><use href="#i-moon"/></svg><svg class="ic only-dark"><use href="#i-sun"/></svg><span>Змінити тему</span></button>
+        <!-- У Django: [[ request.user.first_name ]] і т.д. -->
+      </div>
+    </aside>
+
+    <main class="main">
+      <!-- ═══════════ [% block content %] ═══════════
+           Ось ця частина — унікальна для сторінки "profile_edit.html". -->
+
+      <div class="topbar">
+        <div class="topbar__row">
+          <a class="icon-btn" href="{% url 'feed' %}" data-back aria-label="Назад"><svg class="ic"><use href="#i-back"/></svg></a>
+          <h1 class="topbar__title">Редагування профілю</h1>
+          <button type="button" class="icon-btn topbar__theme" data-theme-toggle aria-label="Змінити тему"><svg class="ic only-light"><use href="#i-moon"/></svg><svg class="ic only-dark"><use href="#i-sun"/></svg></button>
+        </div>
+      </div>
+
+      <form class="page-form form" action="{% url 'profile_edit' %}" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="form__avatar">
+          <div class="avatar avatar--xl" style="--av: {{ request.user.profile.color }}" data-avatar-preview>
+            {% if request.user.profile.avatar %}<img class="avatar__image" src="{{ request.user.profile.avatar.url }}" alt="Фото профілю">{% else %}{{ request.user.profile.initials }}{% endif %}
+          </div>
+          <div class="profile-avatar-editor__field">
+            <span class="profile-avatar-editor__label">Фото профілю</span>
+            {{ form.avatar }}
+            <div class="avatar-file-picker">
+              <label class="avatar-file-picker__button" for="{{ form.avatar.id_for_label }}">Обрати фото</label>
+              <span class="avatar-file-picker__name" data-avatar-filename>Фото не вибрано</span>
+            </div>
+            <small>JPG, PNG або WEBP · до 5 МБ. Після вибору відкриється обрізання.</small>
+          </div>
+          {{ form.avatar.errors }}
+        </div>
+        {% if form.non_field_errors %}<div class="form__errors">{{ form.non_field_errors }}</div>{% endif %}
+        <label for="{{ form.first_name.id_for_label }}">{{ form.first_name.label }}{{ form.first_name }}</label>
+        {{ form.first_name.errors }}
+        <label for="{{ form.username.id_for_label }}">{{ form.username.label }}{{ form.username }}</label>
+        {{ form.username.errors }}
+        <label for="{{ form.school_class.id_for_label }}">{{ form.school_class.label }}{{ form.school_class }}</label>
+        {{ form.school_class.errors }}
+        <label for="{{ form.bio.id_for_label }}">{{ form.bio.label }}{{ form.bio }}</label>
+        {{ form.bio.errors }}
+        <button class="btn btn--block" type="submit">Зберегти</button>
+      </form>
+
+      <div class="crop-modal-root" data-avatar-crop-modal hidden>
+        <section class="crop-modal" role="dialog" aria-modal="true" aria-labelledby="avatar-crop-title">
+          <header class="crop-modal__header">
+            <div>
+              <h2 id="avatar-crop-title">Обрізати фото</h2>
+              <p>Перетягни фото, щоб вибрати потрібну ділянку.</p>
+            </div>
+            <button type="button" class="icon-btn crop-modal__close" data-avatar-crop-cancel aria-label="Скасувати">×</button>
+          </header>
+          <canvas class="crop-modal__canvas" data-avatar-crop-canvas width="320" height="320" aria-label="Попередній перегляд обрізання фото"></canvas>
+          <label class="crop-modal__zoom" for="avatar-crop-zoom">
+            Масштаб
+            <input id="avatar-crop-zoom" type="range" min="1" max="3" step="0.01" value="1" data-avatar-crop-zoom>
+          </label>
+          <div class="crop-modal__actions">
+            <button type="button" class="btn btn--ghost" data-avatar-crop-cancel>Скасувати</button>
+            <button type="button" class="btn" data-avatar-crop-save>Використати фото</button>
+          </div>
+        </section>
+      </div>
+
+      <!-- ═══════════ [% endblock %] ═══════════ -->
+    </main>
+
+    <aside class="aside">
+      <div class="card">
+        <h3 class="card__title">Найближчі події</h3>
+        {% include "partials/upcoming_events.html" %}
+      </div>
+      <div class="card">
+        <h3 class="card__title">Гарячі теми</h3>
+        <div class="aside-tags"><a class="tag" style="--tag: #e8457c" href="{% url 'feed' %}?topic=кохання">#кохання</a><a class="tag" style="--tag: #e08a00" href="{% url 'feed' %}?topic=їдальня">#їдальня</a><a class="tag" style="--tag: #0e9aa7" href="{% url 'feed' %}?topic=події">#події</a><a class="tag" style="--tag: #d1a000" href="{% url 'feed' %}?topic=смішне">#смішне</a></div>
+      </div>
+      <div class="card card--accent">
+        <h3 class="card__title"><svg class="ic"><use href="#i-shield"/></svg> Анонімно, але чесно</h3>
+        <p>Кожен анонімний допис перевіряють модератори. Без образ, без справжніх імен у зізнаннях.</p>
+        <a class="link-btn" href="{% url 'rules' %}">Читати правила →</a>
+      </div>
+      <p class="aside__foot">Шкільний проєкт · Ліцей №8 · 2026</p>
+    </aside>
+  </div>
+
+  <nav class="tabbar">
+    <a href="{% url 'feed' %}" aria-label="Стрічка"><svg class="ic"><use href="#i-home"/></svg></a>
+    <a href="{% url 'search' %}" aria-label="Пошук"><svg class="ic"><use href="#i-search"/></svg></a>
+    <a href="{% url 'post_create' %}" class="tabbar__plus" aria-label="Новий допис"><svg class="ic"><use href="#i-plus"/></svg></a>
+    <a href="{% url 'notifications' %}" aria-label="Сповіщення"><svg class="ic"><use href="#i-bell"/></svg>{% if unread_notification_count %}<span class="nav__badge">{{ unread_notification_count }}</span>{% endif %}</a>
+    <a href="{% url 'profile' %}" class="is-active" aria-label="Профіль"><svg class="ic"><use href="#i-user"/></svg></a>
+  </nav>
+  <div class="toast {% if messages %}is-on{% endif %}" id="toast" role="status" aria-live="polite">
+    {% if messages %}{% for message in messages %}{{ message }}{% endfor %}{% endif %}
+  </div>
+
+  <!-- У Django: <script src="[% static 'js/main.js' %]"></script> -->
+  <script src="{% static 'js/main.js' %}?v=20261027-2"></script>
+  <!-- ═══════════ BASE.HTML: КІНЕЦЬ ═══════════ -->
+</body>
+</html>
