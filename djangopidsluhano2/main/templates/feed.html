@@ -149,14 +149,14 @@
               <div class="menu">
                 <button type="button" data-share><svg class="ic"><use href="#i-link"/></svg> Скопіювати посилання</button>
                 <a href="{% url 'report' %}?post={{ post.pk }}" class="is-danger"><svg class="ic"><use href="#i-flag"/></svg> Поскаржитися</a>
-                {% if request.user == post.author or can_delete_posts %}<form method="post" action="{% url 'post_delete' post.pk %}">{% csrf_token %}<button type="submit" class="is-danger"><svg class="ic"><use href="#i-flag"/></svg> Видалити допис</button></form>{% endif %}
+ 
               </div>
             </details>
           </header>
           <div class="post__tags"><a class="tag" style="--tag: {{ post.tag.color }}" href="?topic={{ post.tag.name|urlencode }}">#{{ post.tag.name }}</a></div>
           <a class="post__link" href="{% url 'post_detail' post.pk %}"><p class="post__text">{{ post.text }}</p></a>
           {% if post.image %}<img class="post__image" src="{{ post.image.url }}" alt="Фото до допису">{% endif %}
-          {% include "partials/poll.html" with post=post %}
+ 
           <footer class="post__actions">
             <form method="post" action="{% url 'post_like' post.pk %}">{% csrf_token %}<button type="submit" class="act act--like{% if post.user_liked %} is-on{% endif %}" aria-label="Вподобати"><svg class="ic"><use href="#i-heart"/></svg><span>{{ post.likes.count }}</span></button></form>
             <a class="act" href="{% url 'post_detail' post.pk %}#reply" aria-label="Коментувати"><svg class="ic"><use href="#i-comment"/></svg><span>{{ post.replies.count }}</span></a>

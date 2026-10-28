@@ -628,9 +628,7 @@ a { color: inherit; text-decoration: none; }
   .modal-root.is-open { place-items: end center; padding: 0; }
   .modal { border-radius: 24px 24px 0 0; max-height: 92vh; padding-bottom: calc(22px + env(safe-area-inset-bottom)); animation: sheetIn .3s cubic-bezier(.2, .9, .3, 1); }
   .toast { bottom: calc(80px + env(safe-area-inset-bottom)); }
-  .notif { align-items: flex-start; gap: 12px; padding: 14px 16px; }
-  .notif__main { overflow-wrap: anywhere; }
-  .notif-actions { padding-right: 16px; padding-left: 16px; }
+ 
   .login__bubbles { display: none; }
   .login h1 { font-size: 30px; }
   .crop-modal-root { align-items: end; padding: 12px; }

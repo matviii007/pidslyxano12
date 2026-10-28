@@ -8,24 +8,13 @@ from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.db import transaction
-from django.db.models import Count, Prefetch, Q
-from django.http import HttpResponseForbidden
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse
-from django.utils.http import url_has_allowed_host_and_scheme
+ 
 from django.views.decorators.http import require_POST
 
 from .forms import PostForm, ProfileForm, RegisterForm, ReplyForm, ReportForm
-from .models import (
-    ModeratorPermissions,
-    Notification,
-    PollOption,
-    Post,
-    Profile,
-    Reply,
-    Report,
-    Tag,
-)
+from .models import ModeratorPermissions, Notification, Post, Profile, Reply, Report, Tag
 
 
 def _get_profile(user):

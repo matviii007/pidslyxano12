@@ -217,18 +217,7 @@ class Post(models.Model):
         self.save(update_fields=['tag', 'pending_tag_name', 'pending_tag_color'])
 
 
-class PollOption(models.Model):
-    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='options')
-    text = models.CharField(max_length=40)
-    voters = models.ManyToManyField(User, related_name='poll_votes', blank=True)
-
-    class Meta:
-        ordering = ['pk']
-
-    def __str__(self):
-        return self.text
-
-
+ 
 class Reply(models.Model):
     """Відповідь (коментар) під дописом. (Етап 6)"""
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='replies')
