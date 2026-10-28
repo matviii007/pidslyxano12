@@ -26,6 +26,24 @@ class LoginForm(AuthenticationForm):
 class PostForm(forms.ModelForm):
     """Форма допису; режим публікації від модерації доступний лише довіреним ролям."""
 
+    option1 = forms.CharField(
+        required=False,
+        max_length=40,
+        strip=True,
+        widget=forms.TextInput(attrs={'placeholder': 'Варіант 1', 'maxlength': 40}),
+    )
+    option2 = forms.CharField(
+        required=False,
+        max_length=40,
+        strip=True,
+        widget=forms.TextInput(attrs={'placeholder': 'Варіант 2', 'maxlength': 40}),
+    )
+    option3 = forms.CharField(
+        required=False,
+        max_length=40,
+        strip=True,
+        widget=forms.TextInput(attrs={'placeholder': "Варіант 3 (необов'язково)", 'maxlength': 40}),
+    )
     new_tag_name = forms.CharField(
         label='Створи кастомний хештег',
         required=False,
@@ -87,6 +105,17 @@ class PostForm(forms.ModelForm):
         cleaned_data = super().clean()
         tag = cleaned_data.get('tag')
         new_tag_name = cleaned_data.get('new_tag_name')
+        poll_options = [
+            cleaned_data.get(f'option{index}', '')
+            for index in range(1, 4)
+        ]
+        poll_options = [option for option in poll_options if option]
+
+        if poll_options and len(poll_options) < 2:
+            raise forms.ValidationError('Для опитування потрібно вказати щонайменше два варіанти.')
+        if len({option.casefold() for option in poll_options}) != len(poll_options):
+            raise forms.ValidationError('Варіанти опитування мають відрізнятися.')
+
         if cleaned_data.get('as_moderation') and cleaned_data.get('is_anonymous'):
             raise forms.ValidationError(
                 'Обери анонімну публікацію або публікацію від імені «Модерація».'

@@ -105,28 +105,6 @@ document.querySelectorAll('[data-follow]').forEach((btn) => {
   });
 });
 
-/* ---------- ДЕМО: голосування в опитуванні ----------
-   У Django голос зберігається в моделі Vote, а відсотки рахує view. */
-document.querySelectorAll('[data-poll]').forEach((poll) => {
-  poll.addEventListener('click', (e) => {
-    const chosen = e.target.closest('.poll__opt');
-    if (!chosen) return;
-    const options = [...poll.querySelectorAll('.poll__opt')];
-    chosen.dataset.votes = +chosen.dataset.votes + 1;
-    const total = options.reduce((sum, o) => sum + +o.dataset.votes, 0);
-    options.forEach((o) => {
-      const pct = Math.round(o.dataset.votes / total * 100);
-      const row = document.createElement('div');
-      row.className = 'poll__res' + (o === chosen ? ' is-mine' : '');
-      row.innerHTML = `<div class="poll__bar" style="width:${pct}%"></div>
-        <span class="poll__label">${o.textContent}${o === chosen ? ' ✓' : ''}</span>
-        <span class="poll__pct">${pct}%</span>`;
-      o.replaceWith(row);
-    });
-    poll.querySelector('.poll__total').textContent = total + ' голосів';
-  });
-});
-
 /* ---------- ДЕМО: вкладки (?tab=...) ----------
    Елементи з data-tabs="posts" (або в стрічці data-filter="all anon")
    показуються лише на перелічених вкладках.

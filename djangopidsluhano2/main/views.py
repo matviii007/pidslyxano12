@@ -8,12 +8,24 @@ from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Prefetch, Q
+from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from .forms import PostForm, ProfileForm, RegisterForm, ReplyForm, ReportForm
-from .models import ModeratorPermissions, Notification, Post, Profile, Reply, Report, Tag
+from .models import (
+    ModeratorPermissions,
+    Notification,
+    PollOption,
+    Post,
+    Profile,
+    Reply,
+    Report,
+    Tag,
+)
 
 
 def _get_profile(user):
@@ -56,7 +68,7 @@ def _notify(recipient, actor, kind, post=None, message=''):
 
 
 def _profile_posts(user):
-    return Post.objects.filter(
+    posts = Post.objects.filter(
         author=user,
         is_approved=True,
         is_anonymous=False,
@@ -67,12 +79,14 @@ def _profile_posts(user):
         'replies',
         'reposts',
     )
+    return _with_poll_data(posts, user)
 
 
 def _profile_reposts(user):
-    return user.reposted_posts.filter(is_approved=True).select_related(
+    posts = user.reposted_posts.filter(is_approved=True).select_related(
         'author', 'tag',
     ).prefetch_related('author__profile', 'likes', 'replies', 'reposts')
+    return _with_poll_data(posts, user)
 
 
 def _profile_replies(user):
@@ -84,6 +98,40 @@ def _profile_replies(user):
     ).select_related('author', 'post', 'post__tag').prefetch_related(
         'author__profile',
     )
+
+
+def _with_poll_data(posts, user):
+    return posts.annotate(
+        user_voted_poll=Count(
+            'options__voters',
+            filter=Q(options__voters=user),
+            distinct=True,
+        ),
+        poll_vote_count=Count('options__voters', distinct=True),
+    ).prefetch_related(
+        Prefetch(
+            'options',
+            queryset=PollOption.objects.annotate(
+                vote_count=Count('voters', distinct=True),
+                user_voted=Count(
+                    'voters',
+                    filter=Q(voters=user),
+                    distinct=True,
+                ),
+            ),
+        ),
+    )
+
+
+def _redirect_back(request, fallback):
+    referrer = request.META.get('HTTP_REFERER', '')
+    if referrer and url_has_allowed_host_and_scheme(
+        referrer,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return redirect(referrer)
+    return redirect(fallback)
 
 
 @login_required
@@ -98,6 +146,7 @@ def feed(request):
         user_reposted=Count('reposts', filter=Q(reposts=request.user), distinct=True),
         user_liked=Count('likes', filter=Q(likes=request.user), distinct=True),
     )
+    posts = _with_poll_data(posts, request.user)
 
     active_tab = request.GET.get('tab', 'all')      # all | anon | following
     active_topic = request.GET.get('topic')          # назва теми або None
@@ -139,9 +188,12 @@ def feed(request):
 def post_detail(request, pk):
     """Сторінка допису з відповідями. Шаблон: post_detail.html  (Етап 6)"""
     post = get_object_or_404(
-        Post.objects.select_related('author', 'tag').prefetch_related(
-            'author__profile',
-            'likes',
+        _with_poll_data(
+            Post.objects.select_related('author', 'tag').prefetch_related(
+                'author__profile',
+                'likes',
+            ),
+            request.user,
         ),
         pk=pk,
         is_approved=True,
@@ -194,7 +246,13 @@ def post_create(request):
                 post.is_approved = True
             else:
                 post.is_approved = False
-            post.save()
+            with transaction.atomic():
+                post.save()
+                PollOption.objects.bulk_create([
+                    PollOption(post=post, text=form.cleaned_data[f'option{index}'])
+                    for index in range(1, 4)
+                    if form.cleaned_data.get(f'option{index}')
+                ])
             if post.is_moderation:
                 messages.success(request, 'Допис від імені «Модерація» опубліковано.')
             else:
@@ -240,6 +298,48 @@ def post_repost(request, pk):
     return redirect(request.META.get('HTTP_REFERER', 'feed'))
 
 
+@login_required
+@require_POST
+def post_delete(request, pk):
+    post = get_object_or_404(Post, pk=pk)
+    if post.author_id != request.user.pk and not _can_moderate(
+        request.user,
+        'can_reject_posts',
+    ):
+        return HttpResponseForbidden('Ви не можете видалити цей допис.')
+
+    image = post.image
+    post.delete()
+    if image:
+        transaction.on_commit(lambda: image.delete(save=False))
+    messages.success(request, 'Допис видалено.')
+    return _redirect_back(request, 'feed')
+
+
+@login_required
+@require_POST
+def poll_vote(request, pk):
+    post = get_object_or_404(Post, pk=pk, is_approved=True)
+    if not request.POST.get('option'):
+        messages.error(request, 'Оберіть варіант опитування.')
+        return _redirect_back(request, reverse('post_detail', args=[post.pk]))
+    option = get_object_or_404(
+        PollOption,
+        pk=request.POST.get('option'),
+        post=post,
+    )
+
+    with transaction.atomic():
+        Post.objects.select_for_update().get(pk=post.pk)
+        options = PollOption.objects.filter(post=post)
+        for poll_option in options:
+            poll_option.voters.remove(request.user)
+        option.voters.add(request.user)
+
+    messages.success(request, 'Ваш голос зараховано.')
+    return _redirect_back(request, reverse('post_detail', args=[post.pk]))
+
+
 def register(request):
     """Реєстрація нового учнівського облікового запису."""
     if request.user.is_authenticated:
@@ -282,6 +382,23 @@ def notifications_mark_read(request):
 
 
 @login_required
+def notification_open(request, pk):
+    notification = get_object_or_404(
+        request.user.notifications.select_related('post', 'actor'),
+        pk=pk,
+    )
+    if not notification.is_read:
+        notification.is_read = True
+        notification.save(update_fields=['is_read'])
+
+    if notification.post_id and notification.post.is_approved:
+        return redirect('post_detail', pk=notification.post_id)
+    if notification.actor_id:
+        return redirect('user_profile', username=notification.actor.username)
+    return redirect('notifications')
+
+
+@login_required
 def search(request):
     query = request.GET.get('q', '').strip()
     current_profile = _get_profile(request.user)
@@ -292,14 +409,14 @@ def search(request):
     users = Profile.objects.none()
     popular_tags = Tag.objects.none()
     if query:
-        posts = Post.objects.filter(
+        posts = _with_poll_data(Post.objects.filter(
             is_approved=True,
         ).filter(
             Q(text__icontains=query)
             | Q(tag__name__icontains=query)
         ).select_related('author', 'tag').prefetch_related(
             'author__profile', 'likes', 'replies', 'reposts',
-        )[:50]
+        )[:50], request.user)
         users = Profile.objects.filter(
             Q(user__username__icontains=query)
             | Q(user__first_name__icontains=query)

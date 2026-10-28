@@ -133,9 +133,12 @@
         <!-- Опитування необов'язкове: <details> розкривається без JavaScript -->
         <details class="poll-editor">
           <summary><svg class="ic"><use href="#i-poll"/></svg> Додати опитування</summary>
-          <input type="text" name="option1" maxlength="40" placeholder="Варіант 1">
-          <input type="text" name="option2" maxlength="40" placeholder="Варіант 2">
-          <input type="text" name="option3" maxlength="40" placeholder="Варіант 3 (необов'язково)">
+          {{ form.option1 }}
+          {{ form.option1.errors }}
+          {{ form.option2 }}
+          {{ form.option2.errors }}
+          {{ form.option3 }}
+          {{ form.option3.errors }}
         </details>
 
         <label class="switch">

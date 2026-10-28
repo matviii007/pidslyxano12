@@ -98,8 +98,8 @@
 
       <div class="notifs">
         {% for notification in notifications %}
-        {% if notification.post %}<a class="notif{% if not notification.is_read %} is-unread{% endif %}" data-tabs="all{% if notification.kind == 'reply' %} mentions{% endif %}" href="{% url 'post_detail' notification.post.pk %}">
-        {% elif notification.actor %}<a class="notif{% if not notification.is_read %} is-unread{% endif %}" data-tabs="all{% if notification.kind == 'reply' %} mentions{% endif %}" href="{% url 'user_profile' notification.actor.username %}">
+        {% if notification.post %}<a class="notif{% if not notification.is_read %} is-unread{% endif %}" data-tabs="all{% if notification.kind == 'reply' %} mentions{% endif %}" href="{% url 'notification_open' notification.pk %}">
+        {% elif notification.actor %}<a class="notif{% if not notification.is_read %} is-unread{% endif %}" data-tabs="all{% if notification.kind == 'reply' %} mentions{% endif %}" href="{% url 'notification_open' notification.pk %}">
         {% else %}<div class="notif{% if not notification.is_read %} is-unread{% endif %}" data-tabs="all">
         {% endif %}
           <div class="notif__ava">
