@@ -12,6 +12,24 @@
 
 const params = new URLSearchParams(location.search);
 
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+
+function saveScrollPosition() {
+  const state = history.state && typeof history.state === 'object' ? history.state : {};
+  history.replaceState({
+    ...state,
+    pl8ScrollX: window.scrollX,
+    pl8ScrollY: window.scrollY,
+  }, '');
+}
+
+window.addEventListener('pagehide', saveScrollPosition);
+window.addEventListener('pageshow', () => {
+  const state = history.state;
+  if (!state || !Number.isFinite(state.pl8ScrollX) || !Number.isFinite(state.pl8ScrollY)) return;
+  requestAnimationFrame(() => window.scrollTo(state.pl8ScrollX, state.pl8ScrollY));
+});
+
 /* ---------- ЗАЛИШИТИ: перемикач світлої/темної теми ---------- */
 document.querySelectorAll('[data-theme-toggle]').forEach((btn) => {
   btn.addEventListener('click', () => {
@@ -63,6 +81,13 @@ document.querySelectorAll('[data-back]').forEach((a) => {
 });
 
 /* ---------- ЗАЛИШИТИ: скопіювати посилання ---------- */
+document.querySelectorAll('[data-post-preview][data-post-url]').forEach((post) => {
+  post.addEventListener('click', (event) => {
+    if (event.target.closest('a, button, form, input, textarea, select, summary, details')) return;
+    location.href = post.dataset.postUrl;
+  });
+});
+
 document.querySelectorAll('[data-share]').forEach((btn) => {
   btn.addEventListener('click', async () => {
     const post = btn.closest('.post');
@@ -105,27 +130,31 @@ document.querySelectorAll('[data-follow]').forEach((btn) => {
   });
 });
 
-/* ---------- ДЕМО: голосування в опитуванні ----------
-   У Django голос зберігається в моделі Vote, а відсотки рахує view. */
-document.querySelectorAll('[data-poll]').forEach((poll) => {
-  poll.addEventListener('click', (e) => {
-    const chosen = e.target.closest('.poll__opt');
-    if (!chosen) return;
-    const options = [...poll.querySelectorAll('.poll__opt')];
-    chosen.dataset.votes = +chosen.dataset.votes + 1;
-    const total = options.reduce((sum, o) => sum + +o.dataset.votes, 0);
-    options.forEach((o) => {
-      const pct = Math.round(o.dataset.votes / total * 100);
-      const row = document.createElement('div');
-      row.className = 'poll__res' + (o === chosen ? ' is-mine' : '');
-      row.innerHTML = `<div class="poll__bar" style="width:${pct}%"></div>
-        <span class="poll__label">${o.textContent}${o === chosen ? ' ✓' : ''}</span>
-        <span class="poll__pct">${pct}%</span>`;
-      o.replaceWith(row);
+const replyForm = document.querySelector('#reply');
+if (replyForm) {
+  const parentField = replyForm.querySelector('input[name="parent_id"]');
+  const target = replyForm.querySelector('[data-replying-to]');
+  const targetLabel = replyForm.querySelector('[data-reply-label]');
+  const targetPreview = replyForm.querySelector('[data-reply-preview]');
+  const cancel = replyForm.querySelector('[data-reply-cancel]');
+
+  document.querySelectorAll('[data-reply-to]').forEach((button) => {
+    button.addEventListener('click', () => {
+      parentField.value = button.dataset.replyTo;
+      targetLabel.textContent = button.dataset.replyLabel;
+      targetPreview.textContent = button.dataset.replyPreview;
+      target.hidden = false;
+      replyForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      replyForm.querySelector('textarea[name="text"]')?.focus();
     });
-    poll.querySelector('.poll__total').textContent = total + ' голосів';
   });
-});
+
+  cancel?.addEventListener('click', () => {
+    parentField.value = '';
+    targetPreview.textContent = '';
+    target.hidden = true;
+  });
+}
 
 /* ---------- ДЕМО: вкладки (?tab=...) ----------
    Елементи з data-tabs="posts" (або в стрічці data-filter="all anon")
@@ -139,6 +168,7 @@ if (tabsNav) {
     a.classList.toggle('is-active', a.dataset.tab === tab);
     // зберігаємо вибрану тему, коли перемикаємо вкладку
     if (params.get('topic')) a.href += '&topic=' + encodeURIComponent(params.get('topic'));
+    if (params.get('sort')) a.href += '&sort=' + encodeURIComponent(params.get('sort'));
   });
   document.querySelectorAll(tabsNav.dataset.target).forEach((el) => {
     const list = el.dataset.tabs || el.dataset.filter;
@@ -153,6 +183,7 @@ if (chips.length) {
   chips.forEach((c) => {
     c.classList.toggle('is-active', c.dataset.tag === tag);
     if (params.get('tab')) c.href += (c.href.includes('?') ? '&' : '?') + 'tab=' + params.get('tab');
+    if (params.get('sort')) c.href += (c.href.includes('?') ? '&' : '?') + 'sort=' + encodeURIComponent(params.get('sort'));
   });
   if (tag) {
     document.querySelectorAll('.feed .post').forEach((p) => {

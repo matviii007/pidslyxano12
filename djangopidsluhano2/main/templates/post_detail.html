@@ -1,4 +1,4 @@
-{% load static %}
+{% load static post_extras %}
 <!doctype html>
 <html lang="uk">
 <!--
@@ -116,47 +116,28 @@
               <summary class="icon-btn" aria-label="Більше"><svg class="ic"><use href="#i-more"/></svg></summary>
               <div class="menu">
                 <button type="button" data-share><svg class="ic"><use href="#i-link"/></svg> Скопіювати посилання</button>
+                {% if request.user == post.author %}<form method="post" action="{% url 'post_delete' post.pk %}" onsubmit="return confirm('Видалити цей допис?')">{% csrf_token %}<button type="submit" class="is-danger">Видалити допис</button></form>{% endif %}
                 <a href="{% url 'report' %}?post={{ post.pk }}" class="is-danger"><svg class="ic"><use href="#i-flag"/></svg> Поскаржитися</a>
- 
               </div>
             </details>
           </header>
-          <div class="post__tags"><a class="tag" style="--tag: {{ post.tag.color }}" href="{% url 'feed' %}?topic={{ post.tag.name|urlencode }}">#{{ post.tag.name }}</a></div>
-          <p class="post__text">{{ post.text }}</p>
+          {% if post.tag %}<div class="post__tags"><a class="tag" style="--tag: {{ post.tag.color }}" href="{% url 'feed' %}?topic={{ post.tag.name|urlencode }}">#{{ post.tag.name }}</a></div>{% endif %}
+          <p class="post__text">{{ post.text|mentionify|linebreaksbr }}</p>
           {% if post.image %}<img class="post__image" src="{{ post.image.url }}" alt="Фото до допису">{% endif %}
- 
+          {% if post.poll_options.all %}{% include "partials/poll.html" with post=post %}{% endif %}
           <footer class="post__actions">
             <form method="post" action="{% url 'post_like' post.pk %}">{% csrf_token %}<button type="submit" class="act act--like{% if is_liked %} is-on{% endif %}" aria-label="Вподобати"><svg class="ic"><use href="#i-heart"/></svg><span>{{ post.likes.count }}</span></button></form>
-            <a class="act" href="#reply" aria-label="Коментувати"><svg class="ic"><use href="#i-comment"/></svg><span>{{ replies.count }}</span></a>
+            <a class="act" href="#reply" aria-label="Коментувати"><svg class="ic"><use href="#i-comment"/></svg><span>{{ reply_count }}</span></a>
             <form method="post" action="{% url 'post_repost' post.pk %}">{% csrf_token %}<button type="submit" class="act act--repost{% if is_reposted %} is-on{% endif %}" aria-label="{% if is_reposted %}Скасувати репост{% else %}Зробити репост{% endif %}"><svg class="ic"><use href="#i-repost"/></svg><span>{{ post.reposts.count }}</span></button></form>
             <button type="button" class="act" data-share aria-label="Надіслати"><svg class="ic"><use href="#i-share"/></svg></button>
           </footer>
         </div>
       </article>
 
-      <div class="replies-head" id="replies">Відповіді <span>{{ replies.count }}</span></div>
+      <div class="replies-head" id="replies">Відповіді <span>{{ reply_count }}</span></div>
       <div class="replies">
         {% for reply in replies %}
-        <div class="reply">
-          {% if reply.is_anonymous %}
-          <div class="avatar avatar--sm avatar--anon" title="Анонім"><svg><use href="#i-mask"/></svg></div>
-          {% else %}
-          <div class="avatar avatar--sm" style="--av: {{ reply.author.profile.color }}">{% if reply.author.profile.avatar %}<img class="avatar__image" src="{{ reply.author.profile.avatar.url }}" alt="">{% else %}{{ reply.author.profile.initials }}{% endif %}</div>
-          {% endif %}
-          <div class="reply__body">
-            <div class="post__head">
-              {% if reply.is_anonymous %}<span class="post__name">Анонім</span>
-              {% else %}<a class="post__name" href="{% url 'user_profile' reply.author.username %}">{{ reply.author.get_full_name|default:reply.author.username }}
-                {% if reply.author.profile.is_verified %}<span class="verified" title="Підтверджений акаунт" aria-label="Підтверджений акаунт"><svg class="ic"><use href="#i-check"/></svg></span>{% endif %}
-                {% if reply.author.profile.role == 'admin' %}<span class="role-badge role-badge--admin">Адміністратор</span>
-                {% elif reply.author.profile.role == 'junior_moderator' %}<span class="role-badge role-badge--moderator">Молодший модератор</span>
-                {% elif reply.author.profile.role == 'senior_moderator' %}<span class="role-badge role-badge--moderator">Старший модератор</span>{% endif %}
-              </a>{% endif %}
-              <span class="post__meta">{{ reply.created_at|timesince }} тому</span>
-            </div>
-            <p class="post__text">{{ reply.text }}</p>
-          </div>
-        </div>
+        {% include "partials/reply.html" with reply=reply %}
         {% empty %}
         <p class="muted">Поки немає відповідей.</p>
         {% endfor %}
@@ -166,6 +147,14 @@
            У Django: method="post" action="[% url 'post_detail' post.id %]" + [% csrf_token %] всередині форми -->
       <form class="reply-form" id="reply" action="{% url 'post_detail' post.pk %}" method="post">
         {% csrf_token %}
+        {{ form.parent_id }}
+        <div class="reply-form__target" data-replying-to hidden>
+          <span class="reply-form__target-copy">
+            <strong>Відповідь для <span data-reply-label></span></strong>
+            <span class="reply-form__target-preview" data-reply-preview></span>
+          </span>
+          <button type="button" data-reply-cancel aria-label="Скасувати відповідь">Скасувати</button>
+        </div>
         <div class="avatar avatar--sm" style="--av: {{ request.user.profile.color }}">{% if request.user.profile.avatar %}<img class="avatar__image" src="{{ request.user.profile.avatar.url }}" alt="">{% else %}{{ request.user.profile.initials }}{% endif %}</div>
         {{ form.text }}
         {{ form.text.errors }}

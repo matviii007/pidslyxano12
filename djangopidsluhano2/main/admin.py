@@ -7,6 +7,7 @@ from django import forms
 from django.forms.models import modelform_factory
 from django.db.models import Q
 
+from .mentions import notify_mentions
 from .models import Event, ModeratorPermissions, Notification, Post, Profile, Reply, Report, Tag
 
 
@@ -118,6 +119,7 @@ class PostAdmin(admin.ModelAdmin):
                 post=obj,
                 kind=Notification.POST_APPROVED,
             )
+            notify_mentions(obj.text, obj.author, obj, obj.is_anonymous)
         elif previous_status and obj.is_rejected and not previous_status['is_rejected']:
             Notification.objects.create(
                 recipient=obj.author,
@@ -140,6 +142,7 @@ class PostAdmin(admin.ModelAdmin):
                     post=post,
                     kind=Notification.POST_APPROVED,
                 )
+                notify_mentions(post.text, post.author, post, post.is_anonymous)
             post.materialize_pending_tag()
 
     @admin.action(description='Відхилити вибрані дописи')

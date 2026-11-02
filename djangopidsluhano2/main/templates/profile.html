@@ -1,4 +1,4 @@
-{% load static %}
+{% load static post_extras %}
 <!doctype html>
 <html lang="uk">
 <!--
@@ -236,7 +236,7 @@
           <article class="post">
             <div class="post__body">
               <header class="post__head"><span class="post__name">Відповідь до допису</span><span class="post__meta">{{ reply.created_at|timesince }} тому</span></header>
-              <p class="post__text">{{ reply.text }}</p>
+              <p class="post__text">{{ reply.text|mentionify|linebreaksbr }}</p>
               <a class="link-btn" href="{% url 'post_detail' reply.post.pk %}">Перейти до допису →</a>
             </div>
           </article>

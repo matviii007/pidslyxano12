@@ -1,4 +1,5 @@
-<article class="post" data-post-url="{% url 'post_detail' post.pk %}">
+{% load post_extras %}
+<article class="post" data-post-preview data-post-url="{% url 'post_detail' post.pk %}">
   <div class="post__side">
     {% if post.is_moderation %}<div class="avatar avatar--moderation">М</div>
     {% elif post.is_anonymous %}<div class="avatar avatar--anon"><svg><use href="#i-mask"/></svg></div>
@@ -20,15 +21,14 @@
         <summary class="icon-btn" aria-label="Більше"><svg class="ic"><use href="#i-more"/></svg></summary>
         <div class="menu">
           <button type="button" data-share><svg class="ic"><use href="#i-link"/></svg> Скопіювати посилання</button>
+          {% if request.user == post.author %}<form method="post" action="{% url 'post_delete' post.pk %}" onsubmit="return confirm('Видалити цей допис?')">{% csrf_token %}<button type="submit" class="is-danger">Видалити допис</button></form>{% endif %}
           <a href="{% url 'report' %}?post={{ post.pk }}" class="is-danger"><svg class="ic"><use href="#i-flag"/></svg> Поскаржитися</a>
- 
         </div>
       </details>
     </header>
     {% if post.tag %}<div class="post__tags"><a class="tag" style="--tag: {{ post.tag.color }}" href="{% url 'feed' %}?topic={{ post.tag.name|urlencode }}">#{{ post.tag.name }}</a></div>{% endif %}
-    <a class="post__link" href="{% url 'post_detail' post.pk %}"><p class="post__text">{{ post.text }}</p></a>
+    <p class="post__text">{{ post.text|mentionify|linebreaksbr }}</p>
     {% if post.image %}<img class="post__image" src="{{ post.image.url }}" alt="Фото до допису">{% endif %}
- 
     <footer class="post__actions">
       <span class="act"><svg class="ic"><use href="#i-heart"/></svg><span>{{ post.likes.count }}</span></span>
       <a class="act" href="{% url 'post_detail' post.pk %}#reply" aria-label="Коментувати"><svg class="ic"><use href="#i-comment"/></svg><span>{{ post.replies.count }}</span></a>

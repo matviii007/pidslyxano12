@@ -93,7 +93,12 @@
         <div class="rule"><span class="rule__n">3</span><div><h3>Чужі фото — тільки з дозволу</h3><p>Не викладайте фото людей, які не погодились на це.</p></div></div>
         <div class="rule"><span class="rule__n">4</span><div><h3>Анонімність — не безкарність</h3><p>Модератори бачать автора анонімного допису і можуть заблокувати акаунт за порушення.</p></div></div>
         <div class="rule"><span class="rule__n">5</span><div><h3>Бачиш проблему — поскаржся</h3><p>Кнопка «Поскаржитися» є в меню кожного допису. Скарги розглядаються протягом дня.</p></div></div>
+        {% if request.user.is_authenticated %}
         <a class="btn btn--block" href="{% url 'post_create' %}">Зрозуміло, написати допис</a>
+        {% else %}
+        <a class="btn btn--block" href="{% url 'register' %}">Зареєструватися</a>
+        <a class="btn btn--block btn--ghost" href="{% url 'login' %}">Увійти</a>
+        {% endif %}
       </div>
 
       <!-- ═══════════ [% endblock %] ═══════════ -->

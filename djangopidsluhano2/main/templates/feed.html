@@ -1,4 +1,4 @@
-{% load static %}
+{% load static post_extras %}
 <!doctype html>
 <html lang="uk">
 <!--
@@ -64,12 +64,19 @@
       <a class="brand" href="{% url 'feed' %}"><svg class="logo-mark"><use href="#i-logo"/></svg><span class="brand__text"><b>Підслухано</b><small>у Ліцеї 8</small></span></a>
       <nav class="nav">
       <a class="nav__item is-active" href="{% url 'feed' %}"><svg class="ic"><use href="#i-home"/></svg><span>Стрічка</span></a>
-      <a class="nav__item" href="{% url 'search' %}"><svg class="ic"><use href="#i-search"/></svg><span>Пошук</span></a>
+      {% if request.user.is_authenticated %}<a class="nav__item" href="{% url 'search' %}"><svg class="ic"><use href="#i-search"/></svg><span>Пошук</span></a>{% endif %}
+      {% if request.user.is_authenticated %}
       <a class="nav__item" href="{% url 'notifications' %}"><svg class="ic"><use href="#i-bell"/></svg><span>Сповіщення</span>{% if unread_notification_count %}<span class="nav__badge">{{ unread_notification_count }}</span>{% endif %}</a>
       <a class="nav__item" href="{% url 'profile' %}"><svg class="ic"><use href="#i-user"/></svg><span>Профіль</span></a>
+      {% else %}<a class="nav__item" href="{% url 'login' %}"><svg class="ic"><use href="#i-user"/></svg><span>Увійти</span></a>{% endif %}
       <a class="nav__item" href="{% url 'rules' %}"><svg class="ic"><use href="#i-book"/></svg><span>Правила</span></a>
       </nav>
+      {% if request.user.is_authenticated %}
       <a class="btn btn--big" href="{% url 'post_create' %}"><svg class="ic"><use href="#i-plus"/></svg><span>Новий допис</span></a>
+      {% else %}
+      <a class="btn btn--big" href="{% url 'register' %}"><svg class="ic"><use href="#i-user"/></svg><span>Реєстрація</span></a>
+      <a class="link-btn" href="{% url 'login' %}">Уже є акаунт? Увійти</a>
+      {% endif %}
       <div class="sidebar__bottom">
         <button type="button" class="nav__item" data-theme-toggle><svg class="ic only-light"><use href="#i-moon"/></svg><svg class="ic only-dark"><use href="#i-sun"/></svg><span>Змінити тему</span></button>
       </div>
@@ -88,7 +95,7 @@
         <nav class="tabs" data-tabs-nav data-default="all" data-target=".feed [data-filter]">
           <a class="tabs__btn" href="?tab=all" data-tab="all">Для вас</a>
           <a class="tabs__btn" href="?tab=anon" data-tab="anon">Анонімні</a>
-          <a class="tabs__btn" href="?tab=following" data-tab="following">Підписки</a>
+          {% if request.user.is_authenticated %}<a class="tabs__btn" href="?tab=following" data-tab="following">Підписки</a>{% endif %}
         </nav>
         <div class="chips">
           <a class="chip chip--all" href="{% url 'feed' %}" data-tag="">Усі теми</a>
@@ -99,13 +106,31 @@
           <a class="chip" style="--tag: {{ tag.color }}" href="{% url 'feed' %}?topic={{ tag.name|urlencode }}" data-tag="{{ tag.name }}">#{{ tag.name }}</a>
           {% endfor %}
         </div>
+        <form class="feed-sort" method="get" action="{% url 'feed' %}">
+          <input type="hidden" name="tab" value="{{ active_tab }}">
+          {% if active_topic %}<input type="hidden" name="topic" value="{{ active_topic }}">{% endif %}
+          <label for="feed-sort">Сортувати:</label>
+          <select id="feed-sort" name="sort">
+            <option value="newest"{% if active_sort == 'newest' %} selected{% endif %}>За новішою датою</option>
+            <option value="oldest"{% if active_sort == 'oldest' %} selected{% endif %}>За старішою датою</option>
+            <option value="media"{% if active_sort == 'media' %} selected{% endif %}>Фото або опитування</option>
+          </select>
+          <button class="btn btn--sm" type="submit">Застосувати</button>
+        </form>
       </div>
 
+      {% if request.user.is_authenticated %}
       <a class="composer-inline" href="{% url 'post_create' %}">
         <div class="avatar" style="--av: {{ request.user.profile.color }}">{% if request.user.profile.avatar %}<img class="avatar__image" src="{{ request.user.profile.avatar.url }}" alt="">{% else %}{{ request.user.profile.initials }}{% endif %}</div>
         <span class="composer-inline__ph">Що почув(-ла) сьогодні в ліцеї?</span>
         <span class="btn btn--sm">Написати</span>
       </a>
+      {% else %}
+      <a class="composer-inline" href="{% url 'register' %}">
+        <span class="composer-inline__ph">Щоб створити допис, зареєструйся або увійди</span>
+        <span class="btn btn--sm">Реєстрація</span>
+      </a>
+      {% endif %}
 
       <!-- СПИСОК ДОПИСІВ.
            Кожна <article class="post"> — це одна картка. У Django їх буде не 12 вручну, а цикл:
@@ -117,7 +142,7 @@
            Готовий приклад картки дивись у django_examples/templates/partials/post_card.html -->
       <div class="feed">
       {% for post in posts %}
-      <article class="post" data-post-url="{% url 'post_detail' post.pk %}" data-tag="{{ post.tag.name }}" data-filter="all{% if post.is_anonymous %} anon{% else %} following{% endif %}">
+      <article class="post" data-post-preview data-post-url="{% url 'post_detail' post.pk %}" data-tag="{{ post.tag.name }}" data-filter="all{% if post.is_anonymous %} anon{% else %} following{% endif %}">
         {% if post.is_pinned %}<div class="post__pinned"><svg class="ic"><use href="#i-pin"/></svg> Закріплено модераторами</div>{% endif %}
         <div class="post__side">
           {% if post.is_moderation %}
@@ -148,15 +173,15 @@
               <summary class="icon-btn" aria-label="Більше"><svg class="ic"><use href="#i-more"/></svg></summary>
               <div class="menu">
                 <button type="button" data-share><svg class="ic"><use href="#i-link"/></svg> Скопіювати посилання</button>
+                {% if request.user == post.author %}<form method="post" action="{% url 'post_delete' post.pk %}" onsubmit="return confirm('Видалити цей допис?')">{% csrf_token %}<button type="submit" class="is-danger">Видалити допис</button></form>{% endif %}
                 <a href="{% url 'report' %}?post={{ post.pk }}" class="is-danger"><svg class="ic"><use href="#i-flag"/></svg> Поскаржитися</a>
- 
               </div>
             </details>
           </header>
-          <div class="post__tags"><a class="tag" style="--tag: {{ post.tag.color }}" href="?topic={{ post.tag.name|urlencode }}">#{{ post.tag.name }}</a></div>
-          <a class="post__link" href="{% url 'post_detail' post.pk %}"><p class="post__text">{{ post.text }}</p></a>
+          {% if post.tag %}<div class="post__tags"><a class="tag" style="--tag: {{ post.tag.color }}" href="?topic={{ post.tag.name|urlencode }}">#{{ post.tag.name }}</a></div>{% endif %}
+          <p class="post__text">{{ post.text|mentionify|linebreaksbr }}</p>
           {% if post.image %}<img class="post__image" src="{{ post.image.url }}" alt="Фото до допису">{% endif %}
- 
+          {% if post.poll_options.all %}{% include "partials/poll.html" with post=post %}{% endif %}
           <footer class="post__actions">
             <form method="post" action="{% url 'post_like' post.pk %}">{% csrf_token %}<button type="submit" class="act act--like{% if post.user_liked %} is-on{% endif %}" aria-label="Вподобати"><svg class="ic"><use href="#i-heart"/></svg><span>{{ post.likes.count }}</span></button></form>
             <a class="act" href="{% url 'post_detail' post.pk %}#reply" aria-label="Коментувати"><svg class="ic"><use href="#i-comment"/></svg><span>{{ post.replies.count }}</span></a>
@@ -535,10 +560,15 @@
 
   <nav class="tabbar">
     <a href="{% url 'feed' %}" class="is-active" aria-label="Стрічка"><svg class="ic"><use href="#i-home"/></svg></a>
+    {% if request.user.is_authenticated %}
     <a href="{% url 'search' %}" aria-label="Пошук"><svg class="ic"><use href="#i-search"/></svg></a>
     <a href="{% url 'post_create' %}" class="tabbar__plus" aria-label="Новий допис"><svg class="ic"><use href="#i-plus"/></svg></a>
     <a href="{% url 'notifications' %}" aria-label="Сповіщення"><svg class="ic"><use href="#i-bell"/></svg>{% if unread_notification_count %}<span class="nav__badge">{{ unread_notification_count }}</span>{% endif %}</a>
     <a href="{% url 'profile' %}" aria-label="Профіль"><svg class="ic"><use href="#i-user"/></svg></a>
+    {% else %}
+    <a href="{% url 'rules' %}" aria-label="Правила"><svg class="ic"><use href="#i-book"/></svg></a>
+    <a href="{% url 'login' %}" class="tabbar__plus" aria-label="Увійти"><svg class="ic"><use href="#i-user"/></svg></a>
+    {% endif %}
   </nav>
   <div class="toast {% if messages %}is-on{% endif %}" id="toast" role="status" aria-live="polite">
     {% if messages %}{% for message in messages %}{{ message }}{% endfor %}{% endif %}

@@ -116,6 +116,7 @@ class Notification(models.Model):
     FOLLOW = 'follow'
     POST_APPROVED = 'post_approved'
     POST_REJECTED = 'post_rejected'
+    MENTION = 'mention'
     TYPE_CHOICES = [
         (LIKE, 'Like'),
         (REPLY, 'Reply'),
@@ -123,6 +124,7 @@ class Notification(models.Model):
         (FOLLOW, 'New follower'),
         (POST_APPROVED, 'Post approved'),
         (POST_REJECTED, 'Post rejected'),
+        (MENTION, 'Mention'),
     ]
 
     recipient = models.ForeignKey(
@@ -217,11 +219,17 @@ class Post(models.Model):
         self.save(update_fields=['tag', 'pending_tag_name', 'pending_tag_color'])
 
 
- 
 class Reply(models.Model):
     """Відповідь (коментар) під дописом. (Етап 6)"""
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='replies')
     author = models.ForeignKey(User, on_delete=models.CASCADE)
+    parent = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        related_name='children',
+        null=True,
+        blank=True,
+    )
     text = models.CharField('Text', max_length=300)
     is_anonymous = models.BooleanField('Anonymous', default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -230,6 +238,33 @@ class Reply(models.Model):
         verbose_name = 'Reply'
         verbose_name_plural = 'Replies'
         ordering = ['created_at']   # старі відповіді зверху, як у чаті
+
+
+class PollOption(models.Model):
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='poll_options')
+    text = models.CharField('Варіант відповіді', max_length=40)
+    votes = models.ManyToManyField(
+        User,
+        through='PollVote',
+        related_name='poll_options_voted',
+        blank=True,
+    )
+
+    class Meta:
+        ordering = ['pk']
+
+    def __str__(self):
+        return self.text
+
+class PollVote(models.Model):
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='poll_votes')
+    option = models.ForeignKey(PollOption, on_delete=models.CASCADE, related_name='ballots')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='poll_votes')
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['post', 'user'], name='unique_user_vote_per_post'),
+        ]
 
 
 class Report(models.Model):

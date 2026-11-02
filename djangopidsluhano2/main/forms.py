@@ -19,14 +19,29 @@ class UkrainianClearableFileInput(forms.ClearableFileInput):
 class LoginForm(AuthenticationForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['username'].widget.attrs['placeholder'] = 'Нікнейм'
+        self.fields['username'].label = 'Електронна пошта'
+        self.fields['username'].widget = forms.EmailInput(attrs={
+            'placeholder': 'Електронна пошта',
+            'autocomplete': 'email',
+        })
         self.fields['password'].widget.attrs['placeholder'] = 'Пароль'
+
+    def clean(self):
+        email = self.cleaned_data.get('username')
+        user = User.objects.filter(email__iexact=email).first() if email else None
+        if not user:
+            raise forms.ValidationError(
+                self.error_messages['invalid_login'],
+                code='invalid_login',
+                params={'username': self.username_field},
+            )
+        self.cleaned_data['username'] = user.get_username()
+        return super().clean()
 
 
 class PostForm(forms.ModelForm):
     """Форма допису; режим публікації від модерації доступний лише довіреним ролям."""
 
- 
     new_tag_name = forms.CharField(
         label='Створи кастомний хештег',
         required=False,
@@ -41,6 +56,11 @@ class PostForm(forms.ModelForm):
         required=False,
         widget=forms.CheckboxInput(attrs={'data-moderation-toggle': ''}),
     )
+    option_1 = forms.CharField(required=False, max_length=40, label='Варіант 1')
+    option_2 = forms.CharField(required=False, max_length=40, label='Варіант 2')
+    option_3 = forms.CharField(required=False, max_length=40, label='Варіант 3')
+    option_4 = forms.CharField(required=False, max_length=40, label='Варіант 4')
+    option_5 = forms.CharField(required=False, max_length=40, label='Варіант 5')
 
     class Meta:
         model = Post
@@ -66,6 +86,10 @@ class PostForm(forms.ModelForm):
     def __init__(self, *args, allow_moderation=False, **kwargs):
         super().__init__(*args, **kwargs)
         self.allow_moderation = allow_moderation
+        for number in range(1, 6):
+            self.fields[f'option_{number}'].widget.attrs.update({
+                'placeholder': f'Варіант {number}',
+            })
         if not allow_moderation:
             self.fields.pop('as_moderation')
 
@@ -88,7 +112,6 @@ class PostForm(forms.ModelForm):
         cleaned_data = super().clean()
         tag = cleaned_data.get('tag')
         new_tag_name = cleaned_data.get('new_tag_name')
- 
         if cleaned_data.get('as_moderation') and cleaned_data.get('is_anonymous'):
             raise forms.ValidationError(
                 'Обери анонімну публікацію або публікацію від імені «Модерація».'
@@ -102,11 +125,21 @@ class PostForm(forms.ModelForm):
                 cleaned_data['tag'] = existing_tag
                 cleaned_data['new_tag_name'] = ''
 
+        options = [
+            cleaned_data.get(f'option_{number}', '').strip()
+            for number in range(1, 6)
+        ]
+        options = [option for option in options if option]
+        if options and len(options) < 2:
+            self.add_error('option_2', 'Для опитування потрібно щонайменше два варіанти.')
+        cleaned_data['poll_options'] = options
         return cleaned_data
 
 
 class ReplyForm(forms.ModelForm):
     """Етап 6."""
+    parent_id = forms.IntegerField(required=False, widget=forms.HiddenInput)
+
     class Meta:
         model = Reply
         fields = ['text', 'is_anonymous']
@@ -179,6 +212,13 @@ class RegisterForm(UserCreationForm):
     """Етап 7. UserCreationForm вже вміє username + password1 + password2,
     ми лише додаємо ім'я і клас."""
     first_name = forms.CharField(label='Ім’я та прізвище', max_length=40)
+    email = forms.EmailField(
+        label='Електронна пошта',
+        widget=forms.EmailInput(attrs={
+            'placeholder': 'Електронна пошта',
+            'autocomplete': 'email',
+        }),
+    )
     school_class = forms.ChoiceField(
         label='Клас',
         choices=[
@@ -194,7 +234,7 @@ class RegisterForm(UserCreationForm):
 
     class Meta(UserCreationForm.Meta):
         model = User
-        fields = ['username', 'first_name']
+        fields = ['username', 'first_name', 'email']
         widgets = {
             'username': forms.TextInput(attrs={'placeholder': 'Нікнейм (латиницею)', 'autocomplete': 'username'}),
         }
@@ -204,3 +244,9 @@ class RegisterForm(UserCreationForm):
         self.fields['first_name'].widget.attrs.update({'placeholder': 'Ім’я та прізвище'})
         self.fields['password1'].widget.attrs.update({'placeholder': 'Пароль', 'autocomplete': 'new-password'})
         self.fields['password2'].widget.attrs.update({'placeholder': 'Повтори пароль', 'autocomplete': 'new-password'})
+
+    def clean_email(self):
+        email = self.cleaned_data['email']
+        if User.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError('Ця електронна пошта вже зареєстрована.')
+        return email

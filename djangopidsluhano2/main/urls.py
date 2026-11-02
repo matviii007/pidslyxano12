@@ -20,11 +20,7 @@ from . import views
 from .forms import LoginForm
 
 urlpatterns = [
-    path(
-        '',
-        auth_views.LoginView.as_view(template_name='login.html', form_class=LoginForm),
-        name='home',
-    ),
+    path('', views.feed, name='home'),
     path('feed/', views.feed, name='feed'),
     path('feed.html', views.feed, name='feed_legacy'),
     path('feed/feed.html', views.feed, name='feed_legacy_nested'),
@@ -38,11 +34,12 @@ urlpatterns = [
     path('post/new/', views.post_create, name='post_create'),
     path('post/<int:pk>/like/', views.post_like, name='post_like'),
     path('post/<int:pk>/repost/', views.post_repost, name='post_repost'),
+    path('post/<int:pk>/delete/', views.post_delete, name='post_delete'),
+    path('post/<int:pk>/vote/', views.poll_vote, name='poll_vote'),
     path('register/', views.register, name='register'),
     path('search/', views.search, name='search'),
     path('notifications/', views.notifications, name='notifications'),
     path('notifications/read/', views.notifications_mark_read, name='notifications_mark_read'),
- 
     path('profile/', views.profile, name='profile'),
     path('profile/edit/', views.profile_edit, name='profile_edit'),
     path('u/<str:username>/', views.user_profile, name='user_profile'),

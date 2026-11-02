@@ -131,11 +131,15 @@
         {{ form.new_tag_name.errors }}
 
         <!-- Опитування необов'язкове: <details> розкривається без JavaScript -->
-        <details class="poll-editor">
+        <details class="poll-editor"{% if form.option_1.value or form.option_2.value or form.option_3.value or form.option_4.value or form.option_5.value %} open{% endif %}>
           <summary><svg class="ic"><use href="#i-poll"/></svg> Додати опитування</summary>
-           <input type="text" name="option1" maxlength="40" placeholder="Варіант 1">
-          <input type="text" name="option2" maxlength="40" placeholder="Варіант 2">
-          <input type="text" name="option3" maxlength="40" placeholder="Варіант 3 (необов'язково)">
+          {{ form.option_1 }}
+          {{ form.option_2 }}
+          {{ form.option_3 }}
+          {{ form.option_4 }}
+          {{ form.option_5 }}
+          {{ form.option_1.errors }}{{ form.option_2.errors }}{{ form.option_3.errors }}
+          {{ form.option_4.errors }}{{ form.option_5.errors }}
         </details>
 
         <label class="switch">

@@ -6,8 +6,10 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
+from datetime import timedelta
 
-from .models import ModeratorPermissions, Notification, Post, Profile, Reply
+from .models import ModeratorPermissions, Notification, PollOption, Post, Profile, Reply
 
 
 def make_test_image():
@@ -25,12 +27,27 @@ class AuthenticationPageTests(TestCase):
     def test_login_and_registration_render_forms(self):
         response = self.client.get(reverse('login'))
         self.assertContains(response, 'name="username"')
+        self.assertContains(response, 'placeholder="Електронна пошта"')
         self.assertContains(response, 'name="password"')
 
         response = self.client.get(reverse('register'))
         self.assertContains(response, 'placeholder="Ім’я та прізвище"')
         self.assertContains(response, 'placeholder="Нікнейм (латиницею)"')
+        self.assertContains(response, 'name="email"')
         self.assertContains(response, 'placeholder="Повтори пароль"')
+
+    def test_user_can_log_in_with_email(self):
+        User.objects.create_user(
+            username='email_user',
+            email='student@example.com',
+            password='StrongPass#1234',
+        )
+        response = self.client.post(reverse('login'), {
+            'username': 'STUDENT@example.com',
+            'password': 'StrongPass#1234',
+        })
+        self.assertRedirects(response, reverse('feed'))
+        self.assertTrue(response.wsgi_request.user.is_authenticated)
 
 
 class SocialActionsTests(TestCase):
@@ -59,7 +76,6 @@ class SocialActionsTests(TestCase):
                 post=self.post,
             ).exists()
         )
-
         self.client.post(reverse('post_repost', args=[self.post.pk]))
         self.assertFalse(self.post.reposts.filter(pk=self.actor.pk).exists())
 
@@ -81,7 +97,12 @@ class SocialActionsTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'вподобав(-ла) ваш допис')
         self.assertContains(response, 'notif__badge--like')
-        self.assertEqual(response.context['unread_count'], 2)
+        self.assertContains(response, 'is-unread')
+        self.assertNotContains(response, 'nav__badge')
+        self.assertEqual(response.context['unread_count'], 0)
+        self.assertFalse(self.actor.notifications.filter(is_read=False).exists())
+        refreshed = self.client.get(reverse('notifications'))
+        self.assertContains(refreshed, 'is-unread')
 
         replies_response = self.client.get(reverse('notifications'), {'tab': 'mentions'})
         self.assertContains(replies_response, 'Відповідь для вкладки')
@@ -222,6 +243,7 @@ class SocialActionsTests(TestCase):
         response = self.client.post(reverse('register'), {
             'username': 'new_student',
             'first_name': 'Новий Учень',
+            'email': 'new_student@example.com',
             'school_class': '9-А',
             'password1': 'StrongPass#1234',
             'password2': 'StrongPass#1234',
@@ -233,6 +255,136 @@ class SocialActionsTests(TestCase):
             Profile.objects.get(user__username='new_student').school_class,
             '9-А',
         )
+        self.assertEqual(
+            User.objects.get(username='new_student').email,
+            'new_student@example.com',
+        )
+
+    def test_guest_feed_and_rules_offer_registration(self):
+        self.client.logout()
+        home_response = self.client.get(reverse('home'))
+        self.assertEqual(home_response.status_code, 200)
+        self.assertContains(home_response, 'Щоб створити допис')
+        feed_response = self.client.get(reverse('feed'))
+        self.assertEqual(feed_response.status_code, 200)
+        self.assertContains(feed_response, 'Щоб створити допис')
+        self.assertContains(feed_response, 'Реєстрація')
+        self.assertContains(feed_response, 'Уже є акаунт? Увійти')
+        rules_response = self.client.get(reverse('rules'))
+        self.assertContains(rules_response, 'Зареєструватися')
+        self.assertContains(rules_response, 'Увійти')
+
+    def test_untagged_post_and_poll_options_are_saved(self):
+        response = self.client.post(reverse('post_create'), {
+            'text': 'Обираємо найкращу страву',
+            'is_anonymous': 'on',
+            'option_1': 'Піца',
+            'option_2': 'Сирники',
+        })
+        self.assertRedirects(response, reverse('feed'))
+        post = Post.objects.get(text='Обираємо найкращу страву')
+        self.assertIsNone(post.tag)
+        self.assertEqual(
+            list(post.poll_options.values_list('text', flat=True)),
+            ['Піца', 'Сирники'],
+        )
+
+    def test_poll_vote_is_single_choice_and_media_sort_includes_polls(self):
+        first = PollOption.objects.create(post=self.post, text='Так')
+        second = PollOption.objects.create(post=self.post, text='Ні')
+        response = self.client.get(reverse('feed'), {'sort': 'media'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            list(response.context['posts'].values_list('pk', flat=True)),
+            [self.post.pk],
+        )
+        self.assertContains(response, 'Проголосувати')
+
+        self.client.post(reverse('poll_vote', args=[self.post.pk]), {'option': second.pk})
+        self.client.post(reverse('poll_vote', args=[self.post.pk]), {'option': first.pk})
+        self.assertTrue(first.votes.filter(pk=self.actor.pk).exists())
+        self.assertFalse(second.votes.filter(pk=self.actor.pk).exists())
+        self.assertEqual(first.votes.count() + second.votes.count(), 1)
+
+    def test_feed_can_be_sorted_oldest_first(self):
+        older = Post.objects.create(
+            author=self.author,
+            text='Старий допис',
+            is_anonymous=False,
+            is_approved=True,
+        )
+        Post.objects.filter(pk=older.pk).update(
+            created_at=timezone.now() - timedelta(days=1),
+        )
+        response = self.client.get(reverse('feed'), {'sort': 'oldest'})
+        ordered_ids = list(response.context['posts'].values_list('pk', flat=True))
+        self.assertLess(ordered_ids.index(older.pk), ordered_ids.index(self.post.pk))
+
+    def test_only_author_can_delete_post(self):
+        own_post = Post.objects.create(
+            author=self.actor,
+            text='Мій допис',
+            is_approved=True,
+        )
+        forbidden = self.client.post(reverse('post_delete', args=[self.post.pk]))
+        self.assertEqual(forbidden.status_code, 404)
+        deleted = self.client.post(reverse('post_delete', args=[own_post.pk]))
+        self.assertRedirects(deleted, reverse('feed'))
+        self.assertFalse(Post.objects.filter(pk=own_post.pk).exists())
+
+    def test_replies_can_be_nested_and_mentions_notify_users(self):
+        parent = Reply.objects.create(
+            post=self.post,
+            author=self.author,
+            text='Початковий коментар',
+        )
+        response = self.client.post(reverse('post_detail', args=[self.post.pk]), {
+            'text': 'Погоджуюсь, @author',
+            'is_anonymous': '',
+            'parent_id': parent.pk,
+        })
+        self.assertRedirects(response, reverse('post_detail', args=[self.post.pk]))
+        child = Reply.objects.get(text='Погоджуюсь, @author')
+        self.assertEqual(child.parent, parent)
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.author,
+                actor=self.actor,
+                kind=Notification.MENTION,
+                post=self.post,
+            ).exists()
+        )
+        self.client.post(reverse('post_detail', args=[self.post.pk]), {
+            'text': 'Анонімна згадка @author',
+            'is_anonymous': 'on',
+            'parent_id': '',
+        })
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.author,
+                actor__isnull=True,
+                kind=Notification.MENTION,
+                message='Анонімна згадка @author',
+            ).exists()
+        )
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.author,
+                actor__isnull=True,
+                kind=Notification.REPLY,
+                message='Анонімна згадка @author',
+            ).exists()
+        )
+        self.client.force_login(self.author)
+        notification_response = self.client.get(reverse('notifications'))
+        self.assertContains(notification_response, '<b>Анонім</b> згадав(-ла) вас')
+        detail = self.client.get(reverse('post_detail', args=[self.post.pk]))
+        self.assertContains(detail, 'data-reply-to')
+        self.assertContains(detail, 'class="reply__quote"')
+        self.assertContains(detail, 'Початковий коментар')
+        self.assertContains(detail, 'data-reply-preview="Початковий коментар"')
+        self.assertNotContains(detail, 'class="reply__children"')
+        self.assertContains(detail, f'href="{reverse("user_profile", args=[self.author.username])}"')
 
 
 class ModeratorPermissionsTests(TestCase):
@@ -250,6 +402,13 @@ class ModeratorPermissionsTests(TestCase):
         )
 
     def test_moderator_can_approve_from_django_admin_when_configured(self):
+        mentioned_user = User.objects.create_user(
+            username='mentioned',
+            password='StrongPass#1234',
+        )
+        Profile.objects.create(user=mentioned_user, school_class='10-Б')
+        self.pending.text = 'На перевірці @mentioned'
+        self.pending.save(update_fields=['text'])
         moderator = User.objects.create_user(username='mod', password='StrongPass#1234')
         Profile.objects.create(
             user=moderator,
@@ -274,6 +433,14 @@ class ModeratorPermissionsTests(TestCase):
             Notification.objects.filter(
                 recipient=self.student,
                 kind=Notification.POST_APPROVED,
+            ).exists()
+        )
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=mentioned_user,
+                actor__isnull=True,
+                kind=Notification.MENTION,
+                post=self.pending,
             ).exists()
         )
 

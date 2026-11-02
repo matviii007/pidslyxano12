@@ -1,0 +1,28 @@
+{% load post_extras %}
+<div class="reply" id="reply-{{ reply.pk }}">
+  {% if reply.is_anonymous %}
+  <div class="avatar avatar--sm avatar--anon" title="Анонім"><svg><use href="#i-mask"/></svg></div>
+  {% else %}
+  <a class="avatar avatar--sm" href="{% url 'user_profile' reply.author.username %}" style="--av: {{ reply.author.profile.color }}">{% if reply.author.profile.avatar %}<img class="avatar__image" src="{{ reply.author.profile.avatar.url }}" alt="">{% else %}{{ reply.author.profile.initials }}{% endif %}</a>
+  {% endif %}
+  <div class="reply__body">
+    {% if reply.parent %}
+    <a class="reply__quote" href="#reply-{{ reply.parent.pk }}">
+      <span class="reply__quote-author">{% if reply.parent.is_anonymous %}Анонім{% else %}{{ reply.parent.author.get_full_name|default:reply.parent.author.username }}{% endif %}</span>
+      <span class="reply__quote-text">{{ reply.parent.text|truncatechars:100 }}</span>
+    </a>
+    {% endif %}
+    <div class="post__head">
+      {% if reply.is_anonymous %}<span class="post__name">Анонім</span>
+      {% else %}<a class="post__name" href="{% url 'user_profile' reply.author.username %}">{{ reply.author.get_full_name|default:reply.author.username }}
+        {% if reply.author.profile.is_verified %}<span class="verified" title="Підтверджений акаунт" aria-label="Підтверджений акаунт"><svg class="ic"><use href="#i-check"/></svg></span>{% endif %}
+        {% if reply.author.profile.role == 'admin' %}<span class="role-badge role-badge--admin">Адміністратор</span>
+        {% elif reply.author.profile.role == 'junior_moderator' %}<span class="role-badge role-badge--moderator">Молодший модератор</span>
+        {% elif reply.author.profile.role == 'senior_moderator' %}<span class="role-badge role-badge--moderator">Старший модератор</span>{% endif %}
+      </a>{% endif %}
+      <span class="post__meta">{{ reply.created_at|timesince }} тому</span>
+    </div>
+    <p class="post__text">{{ reply.text|mentionify|linebreaksbr }}</p>
+    <button class="reply__respond" type="button" data-reply-to="{{ reply.pk }}" data-reply-label="{% if reply.is_anonymous %}Анонім{% else %}{{ reply.author.get_full_name|default:reply.author.username }}{% endif %}" data-reply-preview="{{ reply.text|truncatechars:100 }}">Відповісти</button>
+  </div>
+</div>

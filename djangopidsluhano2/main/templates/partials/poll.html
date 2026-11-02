@@ -1,0 +1,23 @@
+<form class="poll" method="post" action="{% url 'poll_vote' post.pk %}">
+  {% csrf_token %}
+  {% for option in post.poll_options.all %}
+    {% if post.user_poll_option %}
+    <div class="poll__result{% if option == post.user_poll_option %} is-mine{% endif %}">
+      <div class="poll__bar" style="width: {{ option.vote_percent }}%"></div>
+      <span class="poll__label">{{ option.text }}</span>
+      <span class="poll__pct">{{ option.vote_percent }}%</span>
+    </div>
+    {% else %}
+    <label class="poll__choice">
+      <input type="radio" name="option" value="{{ option.pk }}" required>
+      <span>{{ option.text }}</span>
+      <small>{{ option.vote_count }} голосів</small>
+    </label>
+    {% endif %}
+  {% endfor %}
+  {% if post.user_poll_option %}
+    <div class="poll__total">{{ post.poll_vote_count }} голосів</div>
+  {% else %}
+    <button class="btn btn--sm" type="submit">Проголосувати</button>
+  {% endif %}
+</form>
