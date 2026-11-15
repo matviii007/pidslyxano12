@@ -74,6 +74,23 @@ class AuthenticationPageTests(TestCase):
         self.assertTrue(verification_response.wsgi_request.user.is_authenticated)
         self.assertFalse(EmailVerification.objects.exists())
 
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.console.EmailBackend', EMAIL_HOST='')
+    def test_login_still_works_without_smtp_configuration(self):
+        User.objects.create_user(
+            username='console_user',
+            email='console@example.com',
+            password='StrongPass#1234',
+        )
+
+        response = self.client.post(reverse('login'), {
+            'username': 'console@example.com',
+            'password': 'StrongPass#1234',
+        })
+
+        self.assertRedirects(response, reverse('verify_email'))
+        self.assertFalse(response.wsgi_request.user.is_authenticated)
+        self.assertTrue(EmailVerification.objects.filter(user__email='console@example.com').exists())
+
 
 class SocialActionsTests(TestCase):
     def setUp(self):
