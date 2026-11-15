@@ -1,0 +1,42 @@
+{% load static %}
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{{ page_title }} · Підслухано у Ліцеї 8</title>
+  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20261028-5">
+  <script>
+    (function () {
+      var theme = null;
+      try { theme = localStorage.getItem('pl8-theme'); } catch (error) {}
+      if (theme !== 'dark' && theme !== 'light') theme = 'light';
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+</head>
+<body>
+  <main class="login">
+    <section class="login__card">
+      <h1 class="h1--small">{{ page_heading }}</h1>
+      <p class="login__lead">{{ instructions }} Код надіслано на <strong>{{ email }}</strong>; він дійсний 15 хвилин.</p>
+      <form class="form" method="post">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        {{ form.code.errors }}
+        {{ form.code }}
+        <button class="btn btn--block" type="submit">Підтвердити</button>
+      </form>
+      <form class="form" method="post" action="{{ resend_url }}">
+        {% csrf_token %}
+        <button class="btn btn--block btn--ghost" type="submit">Надіслати новий код</button>
+      </form>
+      <p class="login__fine"><a href="{{ back_url }}">{{ back_label }}</a></p>
+    </section>
+  </main>
+  <div class="toast {% if messages %}is-on{% endif %}" id="toast" role="status" aria-live="polite">
+    {% if messages %}{% for message in messages %}{{ message }}{% endfor %}{% endif %}
+  </div>
+  <script src="{% static 'js/main.js' %}"></script>
+</body>
+</html>

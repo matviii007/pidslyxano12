@@ -17,18 +17,13 @@ from django.contrib.auth import views as auth_views
 from django.views.generic import TemplateView
 
 from . import views
-from .forms import LoginForm
 
 urlpatterns = [
     path('', views.feed, name='home'),
     path('feed/', views.feed, name='feed'),
     path('feed.html', views.feed, name='feed_legacy'),
     path('feed/feed.html', views.feed, name='feed_legacy_nested'),
-    path(
-        'login/',
-        auth_views.LoginView.as_view(template_name='login.html', form_class=LoginForm),
-        name='login',
-    ),
+    path('login/', views.login_view, name='login'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
     path('post/<int:pk>/', views.post_detail, name='post_detail'),
     path('post/new/', views.post_create, name='post_create'),
@@ -37,6 +32,8 @@ urlpatterns = [
     path('post/<int:pk>/delete/', views.post_delete, name='post_delete'),
     path('post/<int:pk>/vote/', views.poll_vote, name='poll_vote'),
     path('register/', views.register, name='register'),
+    path('verify-email/', views.verify_email, name='verify_email'),
+    path('verify-email/resend/', views.resend_email_verification, name='resend_email_verification'),
     path('search/', views.search, name='search'),
     path('notifications/', views.notifications, name='notifications'),
     path('notifications/read/', views.notifications_mark_read, name='notifications_mark_read'),

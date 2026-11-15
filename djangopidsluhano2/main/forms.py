@@ -17,6 +17,11 @@ class UkrainianClearableFileInput(forms.ClearableFileInput):
 
 
 class LoginForm(AuthenticationForm):
+    error_messages = {
+        **AuthenticationForm.error_messages,
+        'invalid_login': 'Неправильна електронна пошта або пароль.',
+    }
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['username'].label = 'Електронна пошта'
@@ -143,6 +148,20 @@ class ReplyForm(forms.ModelForm):
     class Meta:
         model = Reply
         fields = ['text', 'is_anonymous']
+
+
+class EmailVerificationForm(forms.Form):
+    code = forms.RegexField(
+        regex=r'^\d{6}$',
+        max_length=6,
+        label='Код із листа',
+        error_messages={'invalid': 'Введи шестизначний код із листа.'},
+        widget=forms.TextInput(attrs={
+            'placeholder': '000000',
+            'inputmode': 'numeric',
+            'autocomplete': 'one-time-code',
+        }),
+    )
 
 
 class ReportForm(forms.ModelForm):

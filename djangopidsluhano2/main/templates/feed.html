@@ -183,9 +183,9 @@
           {% if post.image %}<img class="post__image" src="{{ post.image.url }}" alt="Фото до допису">{% endif %}
           {% if post.poll_options.all %}{% include "partials/poll.html" with post=post %}{% endif %}
           <footer class="post__actions">
-            <form method="post" action="{% url 'post_like' post.pk %}">{% csrf_token %}<button type="submit" class="act act--like{% if post.user_liked %} is-on{% endif %}" aria-label="Вподобати"><svg class="ic"><use href="#i-heart"/></svg><span>{{ post.likes.count }}</span></button></form>
+            <form method="post" action="{% url 'post_like' post.pk %}" data-ajax-action>{% csrf_token %}<button type="submit" class="act act--like{% if post.user_liked %} is-on{% endif %}" aria-label="Вподобати"><svg class="ic"><use href="#i-heart"/></svg><span>{{ post.likes.count }}</span></button></form>
             <a class="act" href="{% url 'post_detail' post.pk %}#reply" aria-label="Коментувати"><svg class="ic"><use href="#i-comment"/></svg><span>{{ post.replies.count }}</span></a>
-            <form method="post" action="{% url 'post_repost' post.pk %}">{% csrf_token %}<button type="submit" class="act act--repost{% if post.user_reposted %} is-on{% endif %}" aria-label="{% if post.user_reposted %}Скасувати репост{% else %}Зробити репост{% endif %}"><svg class="ic"><use href="#i-repost"/></svg><span>{{ post.reposts.count }}</span></button></form>
+            <form method="post" action="{% url 'post_repost' post.pk %}" data-ajax-action>{% csrf_token %}<button type="submit" class="act act--repost{% if post.user_reposted %} is-on{% endif %}" aria-label="{% if post.user_reposted %}Скасувати репост{% else %}Зробити репост{% endif %}"><svg class="ic"><use href="#i-repost"/></svg><span>{{ post.reposts.count }}</span></button></form>
             <button type="button" class="act" data-share aria-label="Надіслати"><svg class="ic"><use href="#i-share"/></svg></button>
           </footer>
         </div>

@@ -64,7 +64,7 @@
       <p class="login__lead">Анонімні зізнання, подяки, загублені речі та все, що чути на перервах.</p>
       <form class="form" method="post">
         {% csrf_token %}
-        {% if form.errors %}<p role="alert">Неправильна електронна пошта або пароль.</p>{% endif %}
+        {{ form.non_field_errors }}
         <input type="hidden" name="next" value="{{ next }}">
         {{ form.username }}
         {{ form.password }}

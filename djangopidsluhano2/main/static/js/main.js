@@ -109,9 +109,62 @@ document.querySelectorAll('[data-share]').forEach((btn) => {
   });
 });
 
-/* ---------- ДЕМО: лайк і репост ----------
-   У Django це буде маленька POST-форма або fetch() до /post/<id>/like/,
-   а кількість лайків рахуватиме сервер. */
+/* ---------- AJAX: лайк, репост і коментар без перезавантаження ---------- */
+document.addEventListener('submit', async (event) => {
+  const form = event.target.closest('form[data-ajax-action], form[data-ajax-reply]');
+  if (!form) return;
+  event.preventDefault();
+
+  const submitButton = form.querySelector('button[type="submit"]');
+  if (submitButton?.disabled) return;
+  if (submitButton) submitButton.disabled = true;
+
+  try {
+    const response = await fetch(form.action, {
+      method: 'POST',
+      body: new FormData(form),
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json',
+      },
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      toast(result.error || 'Не вдалося виконати дію. Перевір введені дані.');
+      return;
+    }
+
+    if (form.matches('[data-ajax-action]')) {
+      const button = form.querySelector('button');
+      const count = button.querySelector('span');
+      button.classList.toggle('is-on', result.active);
+      count.textContent = result.count || '';
+      if (button.classList.contains('act--like')) {
+        button.setAttribute('aria-label', result.active ? 'Зняти вподобання' : 'Вподобати');
+      } else if (button.classList.contains('act--repost')) {
+        button.setAttribute('aria-label', result.active ? 'Скасувати репост' : 'Зробити репост');
+      }
+    } else {
+      const replies = document.querySelector('.replies');
+      replies.querySelector('.muted')?.remove();
+      replies.insertAdjacentHTML('beforeend', result.html);
+      document.querySelectorAll('[data-reply-count], .post__actions a[href="#reply"] span')
+        .forEach((counter) => { counter.textContent = result.reply_count; });
+      form.querySelector('textarea[name="text"]').value = '';
+      form.querySelector('input[name="parent_id"]').value = '';
+      form.querySelector('[data-replying-to]').hidden = true;
+      form.querySelector('[data-reply-preview]').textContent = '';
+      toast('Відповідь додано');
+    }
+  } catch (error) {
+    console.error('Could not complete the social action.', error);
+    toast('Не вдалося виконати дію. Спробуй ще раз.');
+  } finally {
+    if (submitButton) submitButton.disabled = false;
+  }
+});
+
+/* Неавторизовані макетні картки залишаються інтерактивними для демо. */
 document.querySelectorAll('.act--like, .act--repost').forEach((btn) => {
   if (btn.closest('form')) return;
   btn.addEventListener('click', () => {
@@ -138,15 +191,16 @@ if (replyForm) {
   const targetPreview = replyForm.querySelector('[data-reply-preview]');
   const cancel = replyForm.querySelector('[data-reply-cancel]');
 
-  document.querySelectorAll('[data-reply-to]').forEach((button) => {
-    button.addEventListener('click', () => {
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-reply-to]');
+    if (button) {
       parentField.value = button.dataset.replyTo;
       targetLabel.textContent = button.dataset.replyLabel;
       targetPreview.textContent = button.dataset.replyPreview;
       target.hidden = false;
       replyForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
       replyForm.querySelector('textarea[name="text"]')?.focus();
-    });
+    }
   });
 
   cancel?.addEventListener('click', () => {

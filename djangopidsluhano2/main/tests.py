@@ -4,12 +4,23 @@ import tempfile
 from PIL import Image
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.contrib.auth.models import User
-from django.test import TestCase, override_settings
+from django.core import mail
+from django.test import TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from datetime import timedelta
+from asgiref.sync import async_to_sync
 
-from .models import ModeratorPermissions, Notification, PollOption, Post, Profile, Reply
+from .models import (
+    EmailVerification,
+    ModeratorPermissions,
+    Notification,
+    PollOption,
+    Post,
+    Profile,
+    Reply,
+    Report,
+)
 
 
 def make_test_image():
@@ -36,7 +47,8 @@ class AuthenticationPageTests(TestCase):
         self.assertContains(response, 'name="email"')
         self.assertContains(response, 'placeholder="Повтори пароль"')
 
-    def test_user_can_log_in_with_email(self):
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_user_logs_in_only_after_email_code(self):
         User.objects.create_user(
             username='email_user',
             email='student@example.com',
@@ -46,8 +58,21 @@ class AuthenticationPageTests(TestCase):
             'username': 'STUDENT@example.com',
             'password': 'StrongPass#1234',
         })
-        self.assertRedirects(response, reverse('feed'))
-        self.assertTrue(response.wsgi_request.user.is_authenticated)
+        self.assertRedirects(response, reverse('verify_email'))
+        self.assertFalse(response.wsgi_request.user.is_authenticated)
+        self.assertEqual(len(mail.outbox), 1)
+        verification_page = self.client.get(reverse('verify_email'))
+        self.assertContains(verification_page, 'Підтверди вхід')
+        self.assertContains(verification_page, 'name="code"')
+
+        code = mail.outbox[0].body.split(': ')[1].splitlines()[0]
+        verification_response = self.client.post(
+            reverse('verify_email'),
+            {'code': code},
+        )
+        self.assertRedirects(verification_response, reverse('feed'))
+        self.assertTrue(verification_response.wsgi_request.user.is_authenticated)
+        self.assertFalse(EmailVerification.objects.exists())
 
 
 class SocialActionsTests(TestCase):
@@ -78,6 +103,38 @@ class SocialActionsTests(TestCase):
         )
         self.client.post(reverse('post_repost', args=[self.post.pk]))
         self.assertFalse(self.post.reposts.filter(pk=self.actor.pk).exists())
+
+    def test_like_and_repost_ajax_return_server_state(self):
+        headers = {'HTTP_X_REQUESTED_WITH': 'XMLHttpRequest'}
+        like_url = reverse('post_like', args=[self.post.pk])
+        first_like = self.client.post(like_url, **headers)
+        self.assertEqual(first_like.json(), {'active': True, 'count': 1})
+        second_like = self.client.post(like_url, **headers)
+        self.assertEqual(second_like.json(), {'active': False, 'count': 0})
+
+        repost_url = reverse('post_repost', args=[self.post.pk])
+        first_repost = self.client.post(repost_url, **headers)
+        self.assertEqual(first_repost.json(), {'active': True, 'count': 1})
+        second_repost = self.client.post(repost_url, **headers)
+        self.assertEqual(second_repost.json(), {'active': False, 'count': 0})
+
+    def test_reply_ajax_returns_rendered_reply_and_count(self):
+        response = self.client.post(
+            reverse('post_detail', args=[self.post.pk]),
+            {'text': 'Коментар без перезавантаження', 'is_anonymous': ''},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['reply_count'], 1)
+        self.assertIn('Коментар без перезавантаження', response.json()['html'])
+        self.assertTrue(
+            Reply.objects.filter(
+                post=self.post,
+                author=self.actor,
+                text='Коментар без перезавантаження',
+            ).exists()
+        )
 
     def test_notification_list_is_private_and_mark_all_read(self):
         Notification.objects.create(
@@ -237,7 +294,8 @@ class SocialActionsTests(TestCase):
         self.assertRedirects(response, reverse('post_detail', args=[self.post.pk]))
         self.assertTrue(self.post.reports.filter(author=self.actor, reason='spam').exists())
 
-    def test_registration_creates_profile_and_logs_user_in(self):
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_registration_requires_email_code_before_login(self):
         response = self.client.post(reverse('logout'))
         self.assertEqual(response.status_code, 302)
         response = self.client.post(reverse('register'), {
@@ -249,8 +307,12 @@ class SocialActionsTests(TestCase):
             'password2': 'StrongPass#1234',
             'rules_accepted': 'on',
         })
-        self.assertRedirects(response, reverse('feed'))
-        self.assertTrue(response.wsgi_request.user.is_authenticated)
+        self.assertRedirects(response, reverse('verify_email'))
+        self.assertFalse(response.wsgi_request.user.is_authenticated)
+        verification_page = self.client.get(reverse('verify_email'))
+        self.assertContains(verification_page, 'Підтверди пошту')
+        user = User.objects.get(username='new_student')
+        self.assertFalse(user.is_active)
         self.assertEqual(
             Profile.objects.get(user__username='new_student').school_class,
             '9-А',
@@ -259,6 +321,49 @@ class SocialActionsTests(TestCase):
             User.objects.get(username='new_student').email,
             'new_student@example.com',
         )
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertTrue(EmailVerification.objects.filter(user=user).exists())
+
+        code = mail.outbox[0].body.split(': ')[1].splitlines()[0]
+        incorrect_code = '000001' if code != '000001' else '000002'
+        invalid_response = self.client.post(
+            reverse('verify_email'),
+            {'code': incorrect_code},
+        )
+        self.assertContains(invalid_response, 'Неправильний код.')
+        user.refresh_from_db()
+        self.assertFalse(user.is_active)
+
+        verified_response = self.client.post(reverse('verify_email'), {'code': code})
+        self.assertRedirects(verified_response, reverse('feed'))
+        user.refresh_from_db()
+        self.assertTrue(user.is_active)
+        self.assertTrue(verified_response.wsgi_request.user.is_authenticated)
+        self.assertFalse(EmailVerification.objects.filter(user=user).exists())
+
+    def test_verified_profile_posts_are_approved_automatically(self):
+        self.actor.profile.is_verified = True
+        self.actor.profile.save(update_fields=['is_verified'])
+
+        response = self.client.post(reverse('post_create'), {
+            'text': 'Допис верифікованого акаунта',
+            'is_anonymous': 'on',
+        })
+
+        self.assertRedirects(response, reverse('feed'))
+        post = Post.objects.get(text='Допис верифікованого акаунта')
+        self.assertTrue(post.is_approved)
+        self.assertTrue(post.is_anonymous)
+
+    def test_unverified_profile_posts_still_require_moderation(self):
+        response = self.client.post(reverse('post_create'), {
+            'text': 'Допис на модерацію',
+            'is_anonymous': 'on',
+        })
+
+        self.assertRedirects(response, reverse('feed'))
+        post = Post.objects.get(text='Допис на модерацію')
+        self.assertFalse(post.is_approved)
 
     def test_guest_feed_and_rules_offer_registration(self):
         self.client.logout()
@@ -385,6 +490,67 @@ class SocialActionsTests(TestCase):
         self.assertContains(detail, 'data-reply-preview="Початковий коментар"')
         self.assertNotContains(detail, 'class="reply__children"')
         self.assertContains(detail, f'href="{reverse("user_profile", args=[self.author.username])}"')
+
+
+class AdminBotModerationTests(TransactionTestCase):
+    def setUp(self):
+        self.author = User.objects.create_user(username='bot_post_author')
+        self.post = Post.objects.create(
+            author=self.author,
+            text='Допис для перевірки бота',
+            is_approved=False,
+        )
+
+    def test_bot_approves_once_and_sends_notification(self):
+        from admin_bot import moderate_post
+
+        result = async_to_sync(moderate_post)(self.post.pk, 'approve')
+
+        self.post.refresh_from_db()
+        self.assertTrue(self.post.is_approved)
+        self.assertIn('схвалено', result)
+        self.assertEqual(
+            Notification.objects.filter(
+                recipient=self.author,
+                kind=Notification.POST_APPROVED,
+            ).count(),
+            1,
+        )
+        self.assertEqual(
+            async_to_sync(moderate_post)(self.post.pk, 'approve'),
+            'Цей допис уже опрацьовано.',
+        )
+
+    def test_bot_rejects_post_and_resolves_report(self):
+        from admin_bot import moderate_post, resolve_report
+
+        report = Report.objects.create(
+            post=self.post,
+            author=self.author,
+            reason='spam',
+        )
+        result = async_to_sync(moderate_post)(self.post.pk, 'reject')
+        self.post.refresh_from_db()
+        self.assertTrue(self.post.is_rejected)
+        self.assertIn('відхилено', result)
+
+        resolved = async_to_sync(resolve_report)(report.pk, delete_post=False)
+        self.assertIn('залишено', resolved)
+        self.assertFalse(Report.objects.filter(pk=report.pk).exists())
+        self.assertTrue(Post.objects.filter(pk=self.post.pk).exists())
+
+    def test_bot_can_delete_reported_post(self):
+        from admin_bot import resolve_report
+
+        report = Report.objects.create(
+            post=self.post,
+            author=self.author,
+            reason='spam',
+        )
+        result = async_to_sync(resolve_report)(report.pk, delete_post=True)
+
+        self.assertIn('видалено', result)
+        self.assertFalse(Post.objects.filter(pk=self.post.pk).exists())
 
 
 class ModeratorPermissionsTests(TestCase):

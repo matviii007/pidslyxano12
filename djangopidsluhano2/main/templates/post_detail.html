@@ -126,15 +126,15 @@
           {% if post.image %}<img class="post__image" src="{{ post.image.url }}" alt="Фото до допису">{% endif %}
           {% if post.poll_options.all %}{% include "partials/poll.html" with post=post %}{% endif %}
           <footer class="post__actions">
-            <form method="post" action="{% url 'post_like' post.pk %}">{% csrf_token %}<button type="submit" class="act act--like{% if is_liked %} is-on{% endif %}" aria-label="Вподобати"><svg class="ic"><use href="#i-heart"/></svg><span>{{ post.likes.count }}</span></button></form>
+            <form method="post" action="{% url 'post_like' post.pk %}" data-ajax-action>{% csrf_token %}<button type="submit" class="act act--like{% if is_liked %} is-on{% endif %}" aria-label="Вподобати"><svg class="ic"><use href="#i-heart"/></svg><span>{{ post.likes.count }}</span></button></form>
             <a class="act" href="#reply" aria-label="Коментувати"><svg class="ic"><use href="#i-comment"/></svg><span>{{ reply_count }}</span></a>
-            <form method="post" action="{% url 'post_repost' post.pk %}">{% csrf_token %}<button type="submit" class="act act--repost{% if is_reposted %} is-on{% endif %}" aria-label="{% if is_reposted %}Скасувати репост{% else %}Зробити репост{% endif %}"><svg class="ic"><use href="#i-repost"/></svg><span>{{ post.reposts.count }}</span></button></form>
+            <form method="post" action="{% url 'post_repost' post.pk %}" data-ajax-action>{% csrf_token %}<button type="submit" class="act act--repost{% if is_reposted %} is-on{% endif %}" aria-label="{% if is_reposted %}Скасувати репост{% else %}Зробити репост{% endif %}"><svg class="ic"><use href="#i-repost"/></svg><span>{{ post.reposts.count }}</span></button></form>
             <button type="button" class="act" data-share aria-label="Надіслати"><svg class="ic"><use href="#i-share"/></svg></button>
           </footer>
         </div>
       </article>
 
-      <div class="replies-head" id="replies">Відповіді <span>{{ reply_count }}</span></div>
+      <div class="replies-head" id="replies">Відповіді <span data-reply-count>{{ reply_count }}</span></div>
       <div class="replies">
         {% for reply in replies %}
         {% include "partials/reply.html" with reply=reply %}
@@ -145,7 +145,7 @@
 
       <!-- Форма відповіді.
            У Django: method="post" action="[% url 'post_detail' post.id %]" + [% csrf_token %] всередині форми -->
-      <form class="reply-form" id="reply" action="{% url 'post_detail' post.pk %}" method="post">
+      <form class="reply-form" id="reply" action="{% url 'post_detail' post.pk %}" method="post" data-ajax-reply>
         {% csrf_token %}
         {{ form.parent_id }}
         <div class="reply-form__target" data-replying-to hidden>

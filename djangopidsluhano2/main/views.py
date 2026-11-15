@@ -3,18 +3,46 @@
 Тут показано лише головні. Решту (пошук, профіль, сповіщення) напиши сам
 за тим самим зразком — підказки в README.
 """
+from datetime import timedelta
+import secrets
+import smtplib
+
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
+from django.contrib.auth.hashers import check_password, make_password
+from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import BooleanField, Count, Q, Value
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
+from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .forms import PostForm, ProfileForm, RegisterForm, ReplyForm, ReportForm
+from .forms import (
+    EmailVerificationForm,
+    LoginForm,
+    PostForm,
+    ProfileForm,
+    RegisterForm,
+    ReplyForm,
+    ReportForm,
+)
 from .mentions import notify_mentions
-from .models import ModeratorPermissions, Notification, PollOption, PollVote, Post, Profile, Reply, Tag
+from .models import (
+    EmailVerification,
+    ModeratorPermissions,
+    Notification,
+    PollOption,
+    PollVote,
+    Post,
+    Profile,
+    Reply,
+    Tag,
+)
 
 
 def _get_profile(user):
@@ -54,6 +82,31 @@ def _notify(recipient, actor, kind, post=None, message='', anonymous=False):
             post=post,
             message=message,
         )
+
+
+def _wants_json(request):
+    return request.headers.get('x-requested-with') == 'XMLHttpRequest'
+
+
+def _send_email_verification(user, verification=None):
+    code = f'{secrets.randbelow(1_000_000):06d}'
+    if verification is None:
+        verification = EmailVerification.objects.filter(user=user).first()
+        if verification is None:
+            verification = EmailVerification(user=user)
+    verification.code_hash = make_password(code)
+    verification.expires_at = timezone.now() + timedelta(minutes=15)
+    verification.attempts = 0
+    verification.save()
+    sent_count = send_mail(
+        'Код підтвердження електронної пошти',
+        f'Твій код підтвердження: {code}\nКод дійсний 15 хвилин.',
+        None,
+        [user.email],
+        fail_silently=False,
+    )
+    if sent_count != 1:
+        raise smtplib.SMTPException('Email verification message was not sent.')
 
 
 def _prepare_poll_display(post, user):
@@ -215,8 +268,29 @@ def post_detail(request, pk):
                 anonymous=reply.is_anonymous,
             )
             notify_mentions(reply.text, request.user, post, reply.is_anonymous)
+            if _wants_json(request):
+                reply = Reply.objects.select_related(
+                    'author',
+                    'author__profile',
+                    'parent',
+                    'parent__author',
+                    'parent__author__profile',
+                ).get(pk=reply.pk)
+                return JsonResponse({
+                    'html': render_to_string(
+                        'partials/reply.html',
+                        {'reply': reply},
+                        request=request,
+                    ),
+                    'reply_count': post.replies.count(),
+                })
             messages.success(request, 'Відповідь додано')
             return redirect('post_detail', pk=post.pk)
+        if _wants_json(request):
+            return JsonResponse(
+                {'error': 'Перевір текст відповіді та спробуй ще раз.'},
+                status=400,
+            )
     else:
         form = ReplyForm()
 
@@ -254,11 +328,10 @@ def post_create(request):
                 and form.cleaned_data.get('as_moderation', False)
             )
             post.pending_tag_name = form.cleaned_data.get('new_tag_name', '')
+            is_verified = _get_profile(request.user).is_verified
             if post.is_moderation:
                 post.is_anonymous = False
-                post.is_approved = True
-            else:
-                post.is_approved = False
+            post.is_approved = post.is_moderation or is_verified
             post.save()
             for option_text in form.cleaned_data['poll_options']:
                 PollOption.objects.create(post=post, text=option_text)
@@ -266,6 +339,8 @@ def post_create(request):
                 notify_mentions(post.text, request.user, post, post.is_anonymous)
             if post.is_moderation:
                 messages.success(request, 'Допис від імені «Модерація» опубліковано.')
+            elif post.is_approved:
+                messages.success(request, 'Допис опубліковано.')
             else:
                 messages.success(request, 'Надіслано на модерацію. Зазвичай до 15 хв')
             return redirect('feed')
@@ -307,6 +382,7 @@ def poll_vote(request, pk):
 
 
 @login_required
+@require_POST
 def post_like(request, pk):
     """Лайк / зняти лайк. Працює лише через POST. (Етап 9)"""
     post = get_object_or_404(Post, pk=pk, is_approved=True)
@@ -315,6 +391,12 @@ def post_like(request, pk):
     else:
         post.likes.add(request.user)
         _notify(post.author, request.user, Notification.LIKE, post)
+    is_liked = post.likes.filter(pk=request.user.pk).exists()
+    if _wants_json(request):
+        return JsonResponse({
+            'active': is_liked,
+            'count': post.likes.count(),
+        })
     # Повертаємось на ту сторінку, звідки натиснули лайк
     return redirect(request.META.get('HTTP_REFERER', 'feed'))
 
@@ -325,12 +407,44 @@ def post_repost(request, pk):
     post = get_object_or_404(Post, pk=pk, is_approved=True)
     if post.reposts.filter(pk=request.user.pk).exists():
         post.reposts.remove(request.user)
-        messages.success(request, 'Репост скасовано.')
+        is_reposted = False
     else:
         post.reposts.add(request.user)
         _notify(post.author, request.user, Notification.REPOST, post)
-        messages.success(request, 'Допис додано до ваших репостів.')
+        is_reposted = True
+    if _wants_json(request):
+        return JsonResponse({
+            'active': is_reposted,
+            'count': post.reposts.count(),
+        })
+    messages.success(
+        request,
+        'Допис додано до ваших репостів.' if is_reposted else 'Репост скасовано.',
+    )
     return redirect(request.META.get('HTTP_REFERER', 'feed'))
+
+
+def login_view(request):
+    if request.user.is_authenticated:
+        return redirect('feed')
+
+    form = LoginForm(request, data=request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        user = form.get_user()
+        try:
+            with transaction.atomic():
+                _send_email_verification(user)
+        except (OSError, smtplib.SMTPException):
+            form.add_error(
+                None,
+                'Не вдалося надіслати код на пошту. Спробуй пізніше.',
+            )
+        else:
+            request.session.pop('pending_email_verification_user_id', None)
+            request.session['pending_email_login_user_id'] = user.pk
+            messages.success(request, 'Введи код із листа, щоб завершити вхід.')
+            return redirect('verify_email')
+    return render(request, 'login.html', {'form': form})
 
 
 def register(request):
@@ -340,14 +454,140 @@ def register(request):
     if request.method == 'POST':
         form = RegisterForm(request.POST)
         if form.is_valid():
-            user = form.save()
-            Profile.objects.create(user=user, school_class=form.cleaned_data['school_class'])
-            login(request, user)
-            messages.success(request, 'Вітаємо в «Підслухано»!')
-            return redirect('feed')
+            try:
+                with transaction.atomic():
+                    user = form.save()
+                    user.is_active = False
+                    user.save(update_fields=['is_active'])
+                    Profile.objects.create(
+                        user=user,
+                        school_class=form.cleaned_data['school_class'],
+                    )
+                    _send_email_verification(user)
+            except (OSError, smtplib.SMTPException):
+                form.add_error(
+                    None,
+                    'Не вдалося надіслати лист. Перевір адресу або спробуй пізніше.',
+                )
+            else:
+                request.session.pop('pending_email_login_user_id', None)
+                request.session['pending_email_verification_user_id'] = user.pk
+                messages.success(request, 'Ми надіслали код підтвердження на твою пошту.')
+                return redirect('verify_email')
     else:
         form = RegisterForm()
     return render(request, 'register.html', {'form': form})
+
+
+def verify_email(request):
+    session_key = None
+    expected_active = None
+    if request.session.get('pending_email_verification_user_id'):
+        session_key = 'pending_email_verification_user_id'
+        expected_active = False
+    elif request.session.get('pending_email_login_user_id'):
+        session_key = 'pending_email_login_user_id'
+        expected_active = True
+    if session_key is None:
+        messages.error(request, 'Спочатку зареєструйся або увійди в акаунт.')
+        return redirect('login')
+
+    user = User.objects.filter(
+        pk=request.session[session_key],
+        is_active=expected_active,
+    ).first()
+    if user is None:
+        request.session.pop(session_key, None)
+        messages.error(request, 'Запит на підтвердження не знайдено. Повтори спробу.')
+        return redirect('login' if expected_active else 'register')
+
+    verification = EmailVerification.objects.filter(user=user).first()
+    if verification is None:
+        messages.error(request, 'Запит на підтвердження не знайдено. Зареєструйся ще раз.')
+        return redirect('login' if expected_active else 'register')
+
+    if request.method == 'POST':
+        form = EmailVerificationForm(request.POST)
+        if form.is_valid():
+            if verification.expires_at <= timezone.now():
+                form.add_error(None, 'Термін дії коду минув. Запроси новий код.')
+            elif verification.attempts >= 5:
+                form.add_error(None, 'Забагато спроб. Запроси новий код.')
+            else:
+                verification.attempts += 1
+                verification.save(update_fields=['attempts', 'updated_at'])
+                if check_password(form.cleaned_data['code'], verification.code_hash):
+                    if not expected_active:
+                        user.is_active = True
+                        user.save(update_fields=['is_active'])
+                    verification.delete()
+                    request.session.pop(session_key, None)
+                    login(request, user)
+                    messages.success(
+                        request,
+                        'Вхід підтверджено.' if expected_active
+                        else 'Електронну пошту підтверджено. Вітаємо!',
+                    )
+                    return redirect('feed')
+                form.add_error('code', 'Неправильний код.')
+    else:
+        form = EmailVerificationForm()
+
+    return render(request, 'verify_email.html', {
+        'form': form,
+        'email': user.email,
+        'page_title': 'Підтвердження входу' if expected_active else 'Підтвердження пошти',
+        'page_heading': 'Підтверди вхід' if expected_active else 'Підтверди пошту',
+        'instructions': (
+            'Введи шестизначний код із листа, щоб завершити вхід.'
+            if expected_active
+            else 'Введи шестизначний код із листа, щоб підтвердити пошту.'
+        ),
+        'resend_url': reverse(
+            'resend_email_verification',
+        ),
+        'back_url': reverse('login' if expected_active else 'register'),
+        'back_label': 'Повернутися до входу' if expected_active else 'Повернутися до реєстрації',
+    })
+
+
+@require_POST
+def resend_email_verification(request):
+    if request.session.get('pending_email_verification_user_id'):
+        session_key = 'pending_email_verification_user_id'
+        expected_active = False
+    elif request.session.get('pending_email_login_user_id'):
+        session_key = 'pending_email_login_user_id'
+        expected_active = True
+    else:
+        messages.error(request, 'Запит на підтвердження не знайдено. Повтори спробу.')
+        return redirect('login')
+
+    user = User.objects.filter(
+        pk=request.session[session_key],
+        is_active=expected_active,
+    ).first()
+    if user is None:
+        request.session.pop(session_key, None)
+        messages.error(request, 'Запит на підтвердження не знайдено. Повтори спробу.')
+        return redirect('login' if expected_active else 'register')
+
+    verification = EmailVerification.objects.filter(user=user).first()
+    if verification is None:
+        messages.error(request, 'Запит на підтвердження не знайдено. Зареєструйся ще раз.')
+        return redirect('login' if expected_active else 'register')
+    if verification.updated_at > timezone.now() - timedelta(seconds=60):
+        messages.error(request, 'Новий код можна запросити через хвилину.')
+        return redirect('verify_email')
+
+    try:
+        with transaction.atomic():
+            _send_email_verification(user, verification)
+    except (OSError, smtplib.SMTPException):
+        messages.error(request, 'Не вдалося надіслати лист. Спробуй пізніше.')
+    else:
+        messages.success(request, 'Новий код надіслано на твою пошту.')
+    return redirect('verify_email')
 
 
 @login_required
